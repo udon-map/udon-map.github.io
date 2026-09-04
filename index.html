@@ -556,25 +556,28 @@ function ofm(styleName){
   });
 
   // 地図上の「高松市」「丸亀市」などの地名ラベルを消す。
-  // このアプリでは市町を色分けした強調表示で示すので、
-  // 地図タイル側の文字ラベルは不要（むしろピンと重なって邪魔になる）。
+  // レイヤーIDの命名規則を推測すると外すので、IDは一切見ずに
+  // 「文字を描くレイヤー（type が symbol）」を全部消す方式にする。
+  // このアプリでは市町を色分けで示すので、地図側の文字は一切不要。
   layer.on('add', () => {
-    const mgl = layer.getMaplibreMap();
+    const mgl = layer.getMaplibreMap ? layer.getMaplibreMap() : layer._glMap;
+    if (!mgl) return;
+
     const hideLabels = () => {
-      const style = mgl.getStyle();
-      if (!style) return;
+      let style;
+      try { style = mgl.getStyle(); } catch (e) { return; }
+      if (!style || !style.layers) return;
       style.layers.forEach(l => {
-        // OpenFreeMapのスタイルは OpenMapTiles の構成に沿っており、
-        // 地名・国名・道路名などの文字レイヤーは type が "symbol" で、
-        // レイヤーIDが "place_" や "poi_" で始まる（ハイフンではなくアンダースコア）。
-        // それらだけを非表示にする。
-        if (l.type === 'symbol' && /^(place|poi)[_-]/.test(l.id)) {
-          mgl.setLayoutProperty(l.id, 'visibility', 'none');
-        }
+        if (l.type !== 'symbol') return;
+        try { mgl.setLayoutProperty(l.id, 'visibility', 'none'); } catch (e) {}
       });
     };
-    if (mgl.isStyleLoaded()) hideLabels();
-    mgl.on('styledata', hideLabels);   // スタイル切替時にも毎回かけ直す
+
+    // 読み込みの進み方が環境で違うので、複数のタイミングで仕掛ける
+    mgl.on('load', hideLabels);
+    mgl.on('styledata', hideLabels);
+    mgl.on('idle', hideLabels);
+    if (mgl.isStyleLoaded && mgl.isStyleLoaded()) hideLabels();
   });
 
   return layer;
@@ -608,13 +611,12 @@ if (Object.keys(baseLayers).length > 1) {
 }
 map.on('baselayerchange', (e) => localStorage.setItem(TILE_KEY, e.name));
 
-// 地図の移動・ズームを香川県の周辺だけに制限する。
-// これにより、スクロールやピンチで県外まで見えてしまうのを防ぐ。
-// KAGAWAの役所座標から大まかな範囲を作り、少し余白を持たせている。
-const KAGAWA_BOUNDS = L.latLngBounds(KAGAWA.map(c => [c.lat, c.lng])).pad(0.35);
-map.setMaxBounds(KAGAWA_BOUNDS);
-map.setMinZoom(9);
-map.on('drag', () => map.panInsideBounds(KAGAWA_BOUNDS, { animate: false }));
+// 地図の移動範囲は、境界データを読み込んだあとに県境から正確に決める（②-2内）。
+// ドラッグで範囲外へ出そうになったら押し戻す。
+map.on('drag', () => {
+  const b = map.options.maxBounds;
+  if (b) map.panInsideBounds(b, { animate: false });
+});
 
 
 /* =========================================================
@@ -628,6 +630,33 @@ let boundaries = [];        // 市町の形（GeoJSONのfeatureの配列）
 let highlightLayer = null;  // 選択中の市町の縁取り
 let maskLayer = null;       // 選択外を暗くする覆い
 let choropleth = null;      // 「香川県全体」のときに出す、色分けされた市町の一覧
+let prefMask = null;        // 香川県の外を塗りつぶして隠す覆い
+
+/* 香川県の外側を完全に隠す。
+   大きな四角を敷き、17市町の形すべてを「穴」としてくり抜くことで、
+   岡山・徳島・愛媛などの県外が地図に出てこないようにする。 */
+function drawPrefMask(){
+  if (prefMask) return;
+
+  // 全市町の外周リングを集めて穴にする（GeoJSONは[経度,緯度]なので入れ替える）
+  const holes = [];
+  boundaries.forEach(f => {
+    f.geometry.coordinates.forEach(poly => {
+      holes.push(poly[0].map(p => [p[1], p[0]]));
+    });
+  });
+
+  prefMask = L.polygon(
+    [[[85, -180], [85, 180], [-85, 180], [-85, -180]], ...holes],
+    {
+      stroke: false,
+      fillColor: '#e7e7e4',   // 地図の余白と馴染む無彩色。不透明にして完全に隠す
+      fillOpacity: 1,
+      interactive: false      // クリックは地図側に通す
+    }
+  ).addTo(map);
+  prefMask.bringToBack();
+}
 
 // 17市町を塗り分けるための配色。似た色が隣り合わないよう、
 // 少しずつ色相をずらした暖色系でまとめている（差し色の琥珀と馴染むように）。
@@ -652,6 +681,12 @@ fetch('kagawa.geojson')
       if (c !== s.city) { s.city = c; changed = true; }
     });
     if (changed) save();
+
+    // 県外を隠す覆いを敷き、移動できる範囲を実際の県境から決める
+    drawPrefMask();
+    const b = L.geoJSON({ type: 'FeatureCollection', features: boundaries }).getBounds();
+    map.setMaxBounds(b.pad(0.08));      // 県境ぎりぎり＋わずかな余白まで
+    map.setMinZoom(map.getBoundsZoom(b));  // 県全体が収まるズームより引けないようにする
 
     redraw();
     applyArea();
@@ -721,7 +756,6 @@ function applyArea(){
   if (highlightLayer) { map.removeLayer(highlightLayer); highlightLayer = null; }
   if (maskLayer)      { map.removeLayer(maskLayer);      maskLayer = null; }
   if (choropleth)     { map.removeLayer(choropleth); }
-
   const area = areaSelect.value;
 
   // 「香川県全体」のときは、色分けした市町の一覧を出して県全体が収まるように引く
@@ -730,6 +764,7 @@ function applyArea(){
       drawChoropleth();
       choropleth.addTo(map);
       choropleth.bringToBack();
+      if (prefMask) prefMask.bringToBack();   // 県外マスクは常に一番下
       map.fitBounds(choropleth.getBounds(), { padding: [20, 20] });
     }
     return;
@@ -760,6 +795,8 @@ function applyArea(){
     style: { color: '#e8a33d', weight: 3, opacity: 1, fillColor: '#e8a33d', fillOpacity: .07 },
     interactive: false
   }).addTo(map);
+
+  if (prefMask) prefMask.bringToBack();      // 県外マスクは常に一番下
 
   // ③ その市町の全体が画面に収まるように合わせる（ピンの位置は考慮しない）
   map.fitBounds(highlightLayer.getBounds(), { padding: [30, 30] });
