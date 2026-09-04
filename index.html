@@ -320,23 +320,37 @@ button.active{ background:var(--amber); border-color:var(--amber); color:#1a1206
 .row-btn.minus{ color:#f0a29b; }
 .row-btn.plus{ color:var(--amber); }
 
-/* エリア選択（一覧パネル内） */
+/* 一覧パネルの見出し行 */
 .sheet-meta{ display:flex; align-items:center; gap:10px; }
-.sheet-area-wrap{ position:relative; }
-.sheet-area-wrap::after{
-  content:''; position:absolute; right:9px; top:50%;
-  width:5px; height:5px; margin-top:-3px;
-  border-right:1.4px solid var(--muted); border-bottom:1.4px solid var(--muted);
-  transform:rotate(45deg); pointer-events:none;
+.sheet-back{
+  display:none; font-size:11px; padding:5px 12px 5px 9px;
+  background:rgba(255,255,255,.08); box-shadow:none;
 }
-#sheet-area{
-  appearance:none; -webkit-appearance:none;
-  font-family:inherit; font-size:12px; font-weight:500; color:var(--text);
-  background:rgba(255,255,255,.08); border:1px solid var(--line);
-  border-radius:999px; padding:5px 24px 5px 11px; cursor:pointer;
+.sheet-back::before{ content:'◀'; font-size:8px; opacity:.7; }
+.sheet-back.show{ display:inline-flex; }
+
+/* エリアを選ぶ面 */
+.sheet-areas{
+  flex:1; overflow-y:auto; overscroll-behavior:contain;
+  display:none; grid-template-columns:1fr 1fr; gap:7px; padding:12px;
+  align-content:start;
 }
-#sheet-area:hover{ background:rgba(255,255,255,.15); }
-#sheet-area option{ background:#1b2026; color:var(--text); }
+.sheet-areas.show{ display:grid; }
+.sheet-areas::-webkit-scrollbar{ width:8px; }
+.sheet-areas::-webkit-scrollbar-thumb{ background:rgba(255,255,255,.14); border-radius:4px; }
+
+.area-card{
+  display:flex; flex-direction:column; align-items:flex-start; gap:3px;
+  padding:12px 13px; border-radius:11px; text-align:left;
+  background:rgba(255,255,255,.05); border:1px solid var(--line);
+  box-shadow:none;
+}
+.area-card:hover{ background:rgba(255,255,255,.13); }
+.area-card.wide{ grid-column:1 / -1; }
+.area-card b{ font-size:13px; font-weight:600; letter-spacing:.02em; }
+.area-card span{ font-size:10.5px; color:var(--muted); font-variant-numeric:tabular-nums; }
+.area-card span i{ font-style:normal; color:var(--amber); font-weight:700; }
+.area-card.done{ border-color:rgba(232,163,61,.5); background:rgba(232,163,61,.1); }
 .sheet-none{ padding:26px 16px; text-align:center; font-size:12px; color:var(--muted); }
 
 /* ---------- 取り消しトースト ---------- */
@@ -477,11 +491,10 @@ button.active{ background:var(--amber); border-color:var(--amber); color:#1a1206
     <button id="sheet-close" aria-label="閉じる">✕</button>
   </div>
   <div class="sheet-meta">
-    <div class="sheet-area-wrap">
-      <select id="sheet-area"></select>
-    </div>
+    <button id="sheet-back" class="sheet-back">エリアを選び直す</button>
     <span id="sheet-meta"></span>
   </div>
+  <div class="sheet-areas" id="sheet-areas"></div>
   <div class="sheet-list" id="sheet-list"></div>
 </div>
 
@@ -1183,7 +1196,7 @@ const areaSelect = document.getElementById('area');
 areaSelect.addEventListener('change', () => {
   redraw();
   applyArea();
-  if (sheet.classList.contains('open')) renderSheet();
+  if (sheet.classList.contains('open') && sheetView === 'list') renderSheet();
 });
 
 
@@ -1332,7 +1345,10 @@ function onLocationNg(err){
 const sheet   = document.getElementById('sheet');
 const sheetQ  = document.getElementById('sheet-q');
 const sheetLs = document.getElementById('sheet-list');
-const sheetArea = document.getElementById('sheet-area');
+const sheetAreas = document.getElementById('sheet-areas');
+const sheetBack  = document.getElementById('sheet-back');
+
+let sheetView = 'areas';   // 'areas'（エリアを選ぶ）か 'list'（店の一覧）
 
 // スマホで自動フォーカスするとキーボードが一覧を隠すので、PCのときだけ
 const isTouch = matchMedia('(pointer: coarse)').matches;
@@ -1340,30 +1356,40 @@ const isTouch = matchMedia('(pointer: coarse)').matches;
 document.getElementById('btn-list').addEventListener('click', () => {
   sheet.classList.toggle('open');
   if (sheet.classList.contains('open')) {
-    renderSheet();
+    sheetQ.value = '';
+    setSheetView('areas');          // 開いたときは、まずエリアを選ぶ画面から
     if (!isTouch) sheetQ.focus();
   }
 });
 document.getElementById('sheet-close').addEventListener('click', () => sheet.classList.remove('open'));
-sheetQ.addEventListener('input', renderSheet);
+sheetQ.addEventListener('input', () => {
+  // エリアを選ぶ画面で文字を打ったら、全域から探す一覧に切り替える
+  if (sheetView === 'areas' && sheetQ.value.trim()) {
+    areaSelect.value = 'all';
+    areaSelect.dispatchEvent(new Event('change'));
+    setSheetView('list');
+    sheetQ.focus();
+    return;
+  }
+  renderSheet();
+});
 
 function findRegistered(item){
   return shops.find(s => s.name === item.name && Math.abs(s.lat - item.lat) < 1e-5);
 }
 
 function renderSheet(){
+  if (sheetView === 'areas') { renderAreas(); return; }
+
   const kw = sheetQ.value.trim();
   const area = areaSelect.value;
-
-  // 一覧側のエリア選択を、上部の選択と揃えておく
-  refreshSheetAreaOptions();
-  sheetArea.value = area;
 
   let list = catalog.filter(s => area === 'all' || s.city === area);
   if (kw) list = list.filter(s => s.name.includes(kw) || (s.addr || '').includes(kw));
 
   const done = list.filter(findRegistered).length;
-  document.getElementById('sheet-meta').innerHTML = `<b>${done}</b> / ${list.length} 軒`;
+  document.getElementById('sheet-meta').innerHTML =
+    `${area === 'all' ? '香川県全体' : area}　<b>${done}</b> / ${list.length} 軒`;
 
   if (!list.length) {
     sheetLs.innerHTML = '<div class="sheet-none">該当する店がありません。<br>「地図から追加」で手動登録できます。</div>';
@@ -1388,20 +1414,49 @@ function renderSheet(){
   }).join('');
 }
 
-// 一覧パネルのエリア選択の中身を作る
-function refreshSheetAreaOptions(){
-  const cur = sheetArea.value;
-  sheetArea.innerHTML =
-    `<option value="all">香川県全体</option>` +
-    KAGAWA.map(c => `<option value="${c.name}">${c.name}</option>`).join('');
-  if (cur) sheetArea.value = cur;
+/* エリアを選ぶ面を描く。各エリアの「訪問済み / 総数」も出して、
+   どこが手つかずかが一目で分かるようにする。 */
+function renderAreas(){
+  document.getElementById('sheet-meta').textContent = 'エリアを選んでください';
+
+  const card = (value, label, list) => {
+    const done = list.filter(findRegistered).length;
+    const full = list.length > 0 && done === list.length;
+    return `<button class="area-card${value === 'all' ? ' wide' : ''}${full ? ' done' : ''}"
+                    data-area="${value}">
+        <b>${label}</b>
+        <span><i>${done}</i> / ${list.length} 軒</span>
+      </button>`;
+  };
+
+  sheetAreas.innerHTML =
+    card('all', '香川県全体', catalog) +
+    KAGAWA.map(c => card(c.name, c.name, catalog.filter(s => s.city === c.name))).join('');
 }
 
-// 一覧側でエリアを変えたら、上部の選択にも反映する（地図も連動して動く）
-sheetArea.addEventListener('change', () => {
-  areaSelect.value = sheetArea.value;
-  areaSelect.dispatchEvent(new Event('change'));
+// エリアが選ばれたら、店の一覧へ進む（地図も同じエリアへ移動する）
+sheetAreas.addEventListener('click', (e) => {
+  const btn = e.target.closest('.area-card');
+  if (!btn) return;
+  areaSelect.value = btn.dataset.area;
+  areaSelect.dispatchEvent(new Event('change'));   // 地図の表示も切り替わる
+  setSheetView('list');
 });
+
+sheetBack.addEventListener('click', () => {
+  sheetQ.value = '';
+  setSheetView('areas');
+});
+
+// 面の切り替え
+function setSheetView(v){
+  sheetView = v;
+  sheetAreas.classList.toggle('show', v === 'areas');
+  sheetLs.style.display = (v === 'list') ? '' : 'none';
+  sheetBack.classList.toggle('show', v === 'list');
+  sheetQ.placeholder = (v === 'areas') ? '店名で検索（全域から）' : '店名・住所で検索';
+  renderSheet();
+}
 
 /* 訪問回数を1回減らす。0になったら記録ごと消す。 */
 function decrementVisit(item){
