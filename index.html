@@ -294,8 +294,9 @@ button.active{ background:var(--amber); border-color:var(--amber); color:#1a1206
 .row-body{ flex:1; min-width:0; }
 .row-name{ font-size:13px; font-weight:500; margin-bottom:2px; }
 .row-addr{ font-size:10.5px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.row-ctrl{ display:flex; align-items:center; gap:6px; flex-shrink:0; }
 .row-badge{
-  flex-shrink:0; min-width:30px; height:26px; padding:0 8px;
+  min-width:30px; height:26px; padding:0 8px;
   display:flex; align-items:center; justify-content:center;
   border-radius:999px; font-size:12px; font-weight:700;
   font-variant-numeric:tabular-nums;
@@ -306,6 +307,36 @@ button.active{ background:var(--amber); border-color:var(--amber); color:#1a1206
   color:var(--muted); font-weight:400; font-size:15px;
 }
 .row.new .row-name{ color:#c9ccd0; }
+
+/* 行の増減ボタン。指でも押しやすいよう28pxを確保する */
+.row-btn{
+  width:28px; height:28px; padding:0;
+  display:flex; align-items:center; justify-content:center;
+  border-radius:50%; font-size:16px; font-weight:600; line-height:1;
+  background:rgba(255,255,255,.08); border:1px solid var(--line);
+  box-shadow:none; color:var(--text);
+}
+.row-btn:hover{ background:rgba(255,255,255,.2); }
+.row-btn.minus{ color:#f0a29b; }
+.row-btn.plus{ color:var(--amber); }
+
+/* エリア選択（一覧パネル内） */
+.sheet-meta{ display:flex; align-items:center; gap:10px; }
+.sheet-area-wrap{ position:relative; }
+.sheet-area-wrap::after{
+  content:''; position:absolute; right:9px; top:50%;
+  width:5px; height:5px; margin-top:-3px;
+  border-right:1.4px solid var(--muted); border-bottom:1.4px solid var(--muted);
+  transform:rotate(45deg); pointer-events:none;
+}
+#sheet-area{
+  appearance:none; -webkit-appearance:none;
+  font-family:inherit; font-size:12px; font-weight:500; color:var(--text);
+  background:rgba(255,255,255,.08); border:1px solid var(--line);
+  border-radius:999px; padding:5px 24px 5px 11px; cursor:pointer;
+}
+#sheet-area:hover{ background:rgba(255,255,255,.15); }
+#sheet-area option{ background:#1b2026; color:var(--text); }
 .sheet-none{ padding:26px 16px; text-align:center; font-size:12px; color:var(--muted); }
 
 /* ---------- 取り消しトースト ---------- */
@@ -416,7 +447,12 @@ button.active{ background:var(--amber); border-color:var(--amber); color:#1a1206
     <input type="text" id="sheet-q" class="sheet-search" placeholder="店名・住所で検索" autocomplete="off">
     <button id="sheet-close" aria-label="閉じる">✕</button>
   </div>
-  <div class="sheet-meta" id="sheet-meta"></div>
+  <div class="sheet-meta">
+    <div class="sheet-area-wrap">
+      <select id="sheet-area"></select>
+    </div>
+    <span id="sheet-meta"></span>
+  </div>
   <div class="sheet-list" id="sheet-list"></div>
 </div>
 
@@ -430,7 +466,7 @@ button.active{ background:var(--amber); border-color:var(--amber); color:#1a1206
 <input type="file" id="file-input" accept="application/json" hidden>
 
 <div class="toast panel" id="toast">
-  <div class="toast-text"><b id="toast-name"></b> を登録しました</div>
+  <div class="toast-text"><b id="toast-name"></b> <span id="toast-suffix">を登録しました</span></div>
   <button id="toast-undo">取り消す</button>
 </div>
 
@@ -1251,6 +1287,7 @@ function onLocationNg(err){
 const sheet   = document.getElementById('sheet');
 const sheetQ  = document.getElementById('sheet-q');
 const sheetLs = document.getElementById('sheet-list');
+const sheetArea = document.getElementById('sheet-area');
 
 // スマホで自動フォーカスするとキーボードが一覧を隠すので、PCのときだけ
 const isTouch = matchMedia('(pointer: coarse)').matches;
@@ -1273,12 +1310,15 @@ function renderSheet(){
   const kw = sheetQ.value.trim();
   const area = areaSelect.value;
 
+  // 一覧側のエリア選択を、上部の選択と揃えておく
+  refreshSheetAreaOptions();
+  sheetArea.value = area;
+
   let list = catalog.filter(s => area === 'all' || s.city === area);
   if (kw) list = list.filter(s => s.name.includes(kw) || (s.addr || '').includes(kw));
 
   const done = list.filter(findRegistered).length;
-  document.getElementById('sheet-meta').innerHTML =
-    (area === 'all' ? '香川県全体' : area) + `　<b>${done}</b> / ${list.length} 軒`;
+  document.getElementById('sheet-meta').innerHTML = `<b>${done}</b> / ${list.length} 軒`;
 
   if (!list.length) {
     sheetLs.innerHTML = '<div class="sheet-none">該当する店がありません。<br>「地図から追加」で手動登録できます。</div>';
@@ -1288,20 +1328,70 @@ function renderSheet(){
   sheetLs.innerHTML = list.map(s => {
     const reg = findRegistered(s);
     const n = reg ? reg.visits.length : 0;
-    return `<div class="row ${n ? '' : 'new'}" data-i="${catalog.indexOf(s)}">
+    const i = catalog.indexOf(s);
+    return `<div class="row ${n ? '' : 'new'}" data-i="${i}">
         <div class="row-body">
           <div class="row-name">${escapeHtml(s.name)}</div>
           <div class="row-addr">${escapeHtml(s.addr || '')}</div>
         </div>
-        <div class="row-badge">${n || '+'}</div>
+        <div class="row-ctrl">
+          ${n ? `<button class="row-btn minus" data-act="minus" data-i="${i}" aria-label="1回減らす">−</button>` : ''}
+          <div class="row-badge">${n || '+'}</div>
+          ${n ? `<button class="row-btn plus" data-act="plus" data-i="${i}" aria-label="1回増やす">＋</button>` : ''}
+        </div>
       </div>`;
   }).join('');
 }
 
+// 一覧パネルのエリア選択の中身を作る
+function refreshSheetAreaOptions(){
+  const cur = sheetArea.value;
+  sheetArea.innerHTML =
+    `<option value="all">香川県全体</option>` +
+    KAGAWA.map(c => `<option value="${c.name}">${c.name}</option>`).join('');
+  if (cur) sheetArea.value = cur;
+}
+
+// 一覧側でエリアを変えたら、上部の選択にも反映する（地図も連動して動く）
+sheetArea.addEventListener('change', () => {
+  areaSelect.value = sheetArea.value;
+  areaSelect.dispatchEvent(new Event('change'));
+});
+
+/* 訪問回数を1回減らす。0になったら記録ごと消す。 */
+function decrementVisit(item){
+  const shop = findRegistered(item);
+  if (!shop) return;
+
+  const before = shop.visits.slice();          // 取り消し用に控えておく
+
+  shop.visits.pop();
+  if (shop.visits.length === 0) shops = shops.filter(s => s.id !== shop.id);
+
+  save();
+  redraw();
+  renderSheet();
+
+  showUndo(item.name, () => {
+    const still = shops.find(s => s.id === shop.id);
+    if (still) still.visits = before;          // 減らしただけなら戻す
+    else { shop.visits = before; shops.push(shop); }   // 消えていたら復活させる
+    save();
+    redraw();
+    renderSheet();
+  }, 'の記録を1回減らしました');
+}
+
 sheetLs.addEventListener('click', (e) => {
-  const row = e.target.closest('.row');
-  if (!row) return;
-  pickFromCatalog(catalog[Number(row.dataset.i)]);
+  const btn = e.target.closest('.row-btn');
+  if (btn) {                                   // ＋ / − ボタンが押された
+    const item = catalog[Number(btn.dataset.i)];
+    if (btn.dataset.act === 'minus') decrementVisit(item);
+    else                            pickFromCatalog(item);
+    return;
+  }
+  const row = e.target.closest('.row');        // 行そのものが押された＝1回増やす
+  if (row) pickFromCatalog(catalog[Number(row.dataset.i)]);
 });
 
 function pickFromCatalog(item){
@@ -1341,11 +1431,13 @@ function pickFromCatalog(item){
 
 const toast = document.getElementById('toast');
 const toastName = document.getElementById('toast-name');
+const toastSuffix = document.getElementById('toast-suffix');
 let toastTimer = null, lastAction = null;
 
-function showUndo(name, undoFn){
+function showUndo(name, undoFn, suffix){
   lastAction = undoFn;
   toastName.textContent = name;
+  toastSuffix.textContent = suffix || 'を登録しました';
   toast.classList.add('show');
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => toast.classList.remove('show'), 6000);
