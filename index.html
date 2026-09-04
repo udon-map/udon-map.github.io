@@ -550,10 +550,33 @@ function hasWebGL(){
 
 // OpenFreeMap のスタイルを1枚のレイヤーとして作る
 function ofm(styleName){
-  return L.maplibreGL({
+  const layer = L.maplibreGL({
     style: 'https://tiles.openfreemap.org/styles/' + styleName,
     attribution: OFM_CREDIT
   });
+
+  // 地図上の「高松市」「丸亀市」などの地名ラベルを消す。
+  // このアプリでは市町を色分けした強調表示で示すので、
+  // 地図タイル側の文字ラベルは不要（むしろピンと重なって邪魔になる）。
+  layer.on('add', () => {
+    const mgl = layer.getMaplibreMap();
+    const hideLabels = () => {
+      const style = mgl.getStyle();
+      if (!style) return;
+      style.layers.forEach(l => {
+        // OpenFreeMapのスタイルは OpenMapTiles の構成に沿っており、
+        // 地名・国名・道路名などの文字レイヤーは type が "symbol" で、
+        // レイヤーIDが "place" や "poi" から始まる。それらだけを非表示にする。
+        if (l.type === 'symbol' && /^(place|poi)/.test(l.id)) {
+          mgl.setLayoutProperty(l.id, 'visibility', 'none');
+        }
+      });
+    };
+    if (mgl.isStyleLoaded()) hideLabels();
+    mgl.on('styledata', hideLabels);   // スタイル切替時にも毎回かけ直す
+  });
+
+  return layer;
 }
 
 const rasterOSM = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -595,6 +618,16 @@ map.on('baselayerchange', (e) => localStorage.setItem(TILE_KEY, e.name));
 let boundaries = [];        // 市町の形（GeoJSONのfeatureの配列）
 let highlightLayer = null;  // 選択中の市町の縁取り
 let maskLayer = null;       // 選択外を暗くする覆い
+let choropleth = null;      // 「香川県全体」のときに出す、色分けされた市町の一覧
+
+// 17市町を塗り分けるための配色。似た色が隣り合わないよう、
+// 少しずつ色相をずらした暖色系でまとめている（差し色の琥珀と馴染むように）。
+const AREA_COLORS = [
+  '#e8a33d', '#d98c53', '#c9a24a', '#e0b15c', '#cf8f3a',
+  '#e6a95a', '#b98f5a', '#dca24d', '#c78a4a', '#f0b569',
+  '#a98456', '#e2984a', '#d1a866', '#bb9358', '#eab273',
+  '#c49b5f', '#dba54e'
+];
 
 fetch('kagawa.geojson')
   .then(r => r.json())
@@ -649,18 +682,46 @@ function cityAt(lat, lng){
   return guessCity(lat, lng);   // 海の上など、どの市町にも入らないとき
 }
 
+// 「香川県全体」のとき、17市町を色分けして表示する。
+// クリックすると、そのままエリア選択で選んだのと同じ扱いになる。
+function drawChoropleth(){
+  if (choropleth) return;   // 一度作れば使い回す
+  choropleth = L.geoJSON({ type: 'FeatureCollection', features: boundaries }, {
+    style: (f) => ({
+      color: AREA_COLORS[KAGAWA.findIndex(c => c.name === f.properties.name) % AREA_COLORS.length],
+      weight: 1.5,
+      opacity: .85,
+      fillColor: AREA_COLORS[KAGAWA.findIndex(c => c.name === f.properties.name) % AREA_COLORS.length],
+      fillOpacity: .16
+    }),
+    onEachFeature: (f, layer) => {
+      layer.on('mouseover', () => layer.setStyle({ fillOpacity: .32, weight: 2.5 }));
+      layer.on('mouseout',  () => choropleth.resetStyle(layer));
+      layer.on('click', () => {
+        areaSelect.value = f.properties.name;
+        areaSelect.dispatchEvent(new Event('change'));
+      });
+    }
+  });
+  choropleth.addTo(map);
+  choropleth.bringToBack();   // ピンより下、地図タイルより上に敷く
+}
+
 // 選択中のエリアを強調し、それ以外を暗くする
 function applyArea(){
   if (highlightLayer) { map.removeLayer(highlightLayer); highlightLayer = null; }
   if (maskLayer)      { map.removeLayer(maskLayer);      maskLayer = null; }
+  if (choropleth)     { map.removeLayer(choropleth); }
 
   const area = areaSelect.value;
 
-  // 「香川県全体」のときは覆いを外して、県全体が収まるように引く
+  // 「香川県全体」のときは、色分けした市町の一覧を出して県全体が収まるように引く
   if (area === 'all') {
     if (boundaries.length) {
-      const all = L.geoJSON({ type: 'FeatureCollection', features: boundaries });
-      map.fitBounds(all.getBounds(), { padding: [20, 20] });
+      drawChoropleth();
+      choropleth.addTo(map);
+      choropleth.bringToBack();
+      map.fitBounds(choropleth.getBounds(), { padding: [20, 20] });
     }
     return;
   }
