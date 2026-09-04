@@ -351,6 +351,15 @@ button.active{ background:var(--amber); border-color:var(--amber); color:#1a1206
 .area-card span{ font-size:10.5px; color:var(--muted); font-variant-numeric:tabular-nums; }
 .area-card span i{ font-style:normal; color:var(--amber); font-weight:700; }
 .area-card.done{ border-color:rgba(232,163,61,.5); background:rgba(232,163,61,.1); }
+.area-card span em{ font-style:normal; color:#8ea9c9; }
+
+/* 自分で追加した店の目印 */
+.row-own{
+  font-style:normal; font-size:9.5px; font-weight:600;
+  margin-left:6px; padding:1.5px 6px; border-radius:999px;
+  background:rgba(142,169,201,.18); color:#9ebada;
+  letter-spacing:.04em; vertical-align:1px;
+}
 .sheet-none{ padding:26px 16px; text-align:center; font-size:12px; color:var(--muted); }
 
 /* ---------- 取り消しトースト ---------- */
@@ -1149,6 +1158,7 @@ map.on('load', () => {
     fetch('shops.json').then(r => r.json()).catch(() => null)
   ]).then(([geo, cat]) => {
     if (cat) catalog = cat;
+    resolveSrc();          // 以前に登録した店の出どころを判定しておく
     if (!geo) { console.warn('kagawa.geojson を読み込めませんでした'); return; }
 
     boundaries = geo.features;
@@ -1272,6 +1282,7 @@ function addShopAt(lat, lng, title){
     shops.push({
       id, name, lat, lng,
       city: document.getElementById('new-city').value,
+      src: 'custom',                     // 自分で場所を指定して追加した店
       visits: [today()]
     });
 
@@ -1374,8 +1385,47 @@ sheetQ.addEventListener('input', () => {
   renderSheet();
 });
 
+/* この機能より前に登録した店には src が無いので、
+   店名が一覧に載っているかどうかで後から振り分ける。一度だけ実行される。 */
+function resolveSrc(){
+  let changed = false;
+  shops.forEach(s => {
+    if (s.src) return;
+    s.src = catalog.some(c => c.name === s.name) ? 'catalog' : 'custom';
+    changed = true;
+  });
+  if (changed) save();
+}
+
+// 自分で追加した店（一覧に載っていないもの）
+function customShops(){
+  return shops.filter(s => s.src === 'custom');
+}
+
 function findRegistered(item){
   return shops.find(s => s.name === item.name && Math.abs(s.lat - item.lat) < 1e-5);
+}
+
+let sheetEntries = [];   // いま一覧に並んでいる項目（一覧由来と自作が混ざる）
+
+/* エリアと検索語から、一覧に並べる項目を組み立てる。
+   ・kind 'catalog' … shops.json に載っている店
+   ・kind 'custom'  … 自分で地図に追加した店（登録時のエリアがそのまま反映される）*/
+function buildEntries(area, kw){
+  const hit = (name, addr) =>
+    !kw || name.includes(kw) || (addr || '').includes(kw);
+
+  const fromCatalog = catalog
+    .filter(s => (area === 'all' || s.city === area) && hit(s.name, s.addr))
+    .map(item => ({ kind: 'catalog', item, name: item.name, addr: item.addr,
+                    shop: findRegistered(item) }));
+
+  const fromCustom = customShops()
+    .filter(s => (area === 'all' || s.city === area) && hit(s.name, s.addr))
+    .map(shop => ({ kind: 'custom', shop, name: shop.name, addr: shop.addr || '自分で追加した店' }));
+
+  // 自分で追加した店を上に出す（数が少なく、探しているのはたいていこちらのため）
+  return fromCustom.concat(fromCatalog);
 }
 
 function renderSheet(){
@@ -1384,26 +1434,24 @@ function renderSheet(){
   const kw = sheetQ.value.trim();
   const area = areaSelect.value;
 
-  let list = catalog.filter(s => area === 'all' || s.city === area);
-  if (kw) list = list.filter(s => s.name.includes(kw) || (s.addr || '').includes(kw));
+  sheetEntries = buildEntries(area, kw);
 
-  const done = list.filter(findRegistered).length;
+  const done = sheetEntries.filter(e => e.shop).length;
   document.getElementById('sheet-meta').innerHTML =
-    `${area === 'all' ? '香川県全体' : area}　<b>${done}</b> / ${list.length} 軒`;
+    `${area === 'all' ? '香川県全体' : area}　<b>${done}</b> / ${sheetEntries.length} 軒`;
 
-  if (!list.length) {
+  if (!sheetEntries.length) {
     sheetLs.innerHTML = '<div class="sheet-none">該当する店がありません。<br>「地図から追加」で手動登録できます。</div>';
     return;
   }
 
-  sheetLs.innerHTML = list.map(s => {
-    const reg = findRegistered(s);
-    const n = reg ? reg.visits.length : 0;
-    const i = catalog.indexOf(s);
+  sheetLs.innerHTML = sheetEntries.map((e, i) => {
+    const n = e.shop ? e.shop.visits.length : 0;
     return `<div class="row ${n ? '' : 'new'}" data-i="${i}">
         <div class="row-body">
-          <div class="row-name">${escapeHtml(s.name)}</div>
-          <div class="row-addr">${escapeHtml(s.addr || '')}</div>
+          <div class="row-name">${escapeHtml(e.name)}${
+            e.kind === 'custom' ? '<em class="row-own">自分で追加</em>' : ''}</div>
+          <div class="row-addr">${escapeHtml(e.addr || '')}</div>
         </div>
         <div class="row-ctrl">
           ${n ? `<button class="row-btn minus" data-act="minus" data-i="${i}" aria-label="1回減らす">−</button>` : ''}
@@ -1414,24 +1462,59 @@ function renderSheet(){
   }).join('');
 }
 
+/* 一覧の項目から訪問を1回増やす */
+function entryPlus(e){
+  if (e.kind === 'catalog') { pickFromCatalog(e.item); return; }
+
+  const shop = e.shop;
+  shop.visits.push(today());
+  save(); redraw(); renderSheet();
+  map.easeTo({ center: [shop.lng, shop.lat], zoom: 15, duration: 600 });
+  if (markers[shop.id]) markers[shop.id].togglePopup();
+  showUndo(shop.name, () => { shop.visits.pop(); save(); redraw(); renderSheet(); },
+           'の記録を1回増やしました');
+}
+
+/* 一覧の項目から訪問を1回減らす。0になったら記録ごと消す。 */
+function entryMinus(e){
+  const shop = e.shop;
+  if (!shop) return;
+
+  const before = shop.visits.slice();          // 取り消し用に控えておく
+
+  shop.visits.pop();
+  if (shop.visits.length === 0) shops = shops.filter(s => s.id !== shop.id);
+
+  save(); redraw(); renderSheet();
+
+  showUndo(shop.name, () => {
+    const still = shops.find(s => s.id === shop.id);
+    if (still) still.visits = before;                  // 減らしただけなら戻す
+    else { shop.visits = before; shops.push(shop); }   // 消えていたら復活させる
+    save(); redraw(); renderSheet();
+  }, 'の記録を1回減らしました');
+}
+
 /* エリアを選ぶ面を描く。各エリアの「訪問済み / 総数」も出して、
    どこが手つかずかが一目で分かるようにする。 */
 function renderAreas(){
   document.getElementById('sheet-meta').textContent = 'エリアを選んでください';
 
-  const card = (value, label, list) => {
-    const done = list.filter(findRegistered).length;
+  // buildEntries を使うので、自分で追加した店も件数に含まれる
+  const card = (value, label) => {
+    const list = buildEntries(value, '');
+    const done = list.filter(e => e.shop).length;
+    const own  = list.filter(e => e.kind === 'custom').length;
     const full = list.length > 0 && done === list.length;
     return `<button class="area-card${value === 'all' ? ' wide' : ''}${full ? ' done' : ''}"
                     data-area="${value}">
         <b>${label}</b>
-        <span><i>${done}</i> / ${list.length} 軒</span>
+        <span><i>${done}</i> / ${list.length} 軒${own ? `　<em>+${own} 自作</em>` : ''}</span>
       </button>`;
   };
 
   sheetAreas.innerHTML =
-    card('all', '香川県全体', catalog) +
-    KAGAWA.map(c => card(c.name, c.name, catalog.filter(s => s.city === c.name))).join('');
+    card('all', '香川県全体') + KAGAWA.map(c => card(c.name, c.name)).join('');
 }
 
 // エリアが選ばれたら、店の一覧へ進む（地図も同じエリアへ移動する）
@@ -1458,40 +1541,20 @@ function setSheetView(v){
   renderSheet();
 }
 
-/* 訪問回数を1回減らす。0になったら記録ごと消す。 */
-function decrementVisit(item){
-  const shop = findRegistered(item);
-  if (!shop) return;
-
-  const before = shop.visits.slice();          // 取り消し用に控えておく
-
-  shop.visits.pop();
-  if (shop.visits.length === 0) shops = shops.filter(s => s.id !== shop.id);
-
-  save();
-  redraw();
-  renderSheet();
-
-  showUndo(item.name, () => {
-    const still = shops.find(s => s.id === shop.id);
-    if (still) still.visits = before;          // 減らしただけなら戻す
-    else { shop.visits = before; shops.push(shop); }   // 消えていたら復活させる
-    save();
-    redraw();
-    renderSheet();
-  }, 'の記録を1回減らしました');
-}
-
 sheetLs.addEventListener('click', (e) => {
   const btn = e.target.closest('.row-btn');
   if (btn) {                                   // ＋ / − ボタンが押された
-    const item = catalog[Number(btn.dataset.i)];
-    if (btn.dataset.act === 'minus') decrementVisit(item);
-    else                            pickFromCatalog(item);
+    const entry = sheetEntries[Number(btn.dataset.i)];
+    if (!entry) return;
+    if (btn.dataset.act === 'minus') entryMinus(entry);
+    else                            entryPlus(entry);
     return;
   }
   const row = e.target.closest('.row');        // 行そのものが押された＝1回増やす
-  if (row) pickFromCatalog(catalog[Number(row.dataset.i)]);
+  if (row) {
+    const entry = sheetEntries[Number(row.dataset.i)];
+    if (entry) entryPlus(entry);
+  }
 });
 
 function pickFromCatalog(item){
@@ -1509,6 +1572,7 @@ function pickFromCatalog(item){
       city: item.city || cityAt(item.lat, item.lng),
       addr: item.addr,
       approx: item.approx || 0,
+      src: 'catalog',                    // うどん屋一覧から選んだ店
       visits: [today()]
     };
     shops.push(shop);
