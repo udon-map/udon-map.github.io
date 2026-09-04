@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>プライバシーポリシー｜うどんマップ</title>
+<meta name="description" content="うどんマップにおける位置情報・記録データの取り扱い、アクセス解析、広告についての方針を記載しています。">
+<link rel="canonical" href="https://udon-map.github.io/privacy.html">
+<meta name="theme-color" content="#12161b">
+<meta name="robots" content="index, follow">
+
+<style>
+:root{
+  --ink:#12161b;
+  --text:#f1efec;
+  --muted:#99a1a9;
+  --amber:#e8a33d;
+  --line:rgba(255,255,255,.10);
+}
+*{ box-sizing:border-box; margin:0; padding:0; }
+body{
+  font-family:-apple-system, "Hiragino Sans", "Noto Sans JP", "Yu Gothic UI", "Segoe UI", sans-serif;
+  font-feature-settings:"palt" 1;
+  background:var(--ink);
+  color:var(--text);
+  line-height:1.9;
+  font-size:14px;
+  padding:0 20px 80px;
+}
+.wrap{ max-width:680px; margin:0 auto; }
+
+header{
+  padding:34px 0 26px;
+  border-bottom:1px solid var(--line);
+  margin-bottom:34px;
+}
+.brand{
+  display:inline-flex; flex-direction:column;
+  text-decoration:none; line-height:1.15;
+}
+.brand b{ font-size:15px; font-weight:700; letter-spacing:.16em; color:var(--text); }
+.brand b i{ font-style:normal; color:var(--amber); }
+.brand small{ font-size:10px; letter-spacing:.22em; color:var(--muted); }
+
+h1{
+  font-size:22px; font-weight:600; letter-spacing:.03em;
+  margin-top:22px;
+}
+.lead{ color:var(--muted); font-size:13px; margin-top:10px; }
+
+h2{
+  font-size:15px; font-weight:600; letter-spacing:.03em;
+  margin:34px 0 10px;
+  padding-left:11px;
+  border-left:3px solid var(--amber);
+}
+p{ margin-bottom:12px; color:#ddd9d4; }
+ul{ margin:0 0 12px 20px; color:#ddd9d4; }
+li{ margin-bottom:6px; }
+a{ color:var(--amber); }
+strong{ color:var(--text); font-weight:600; }
+
+.note{
+  background:rgba(255,255,255,.045);
+  border:1px solid var(--line);
+  border-radius:12px;
+  padding:16px 18px;
+  margin:18px 0;
+  font-size:13px;
+}
+
+footer{
+  margin-top:52px; padding-top:22px;
+  border-top:1px solid var(--line);
+  color:var(--muted); font-size:12px;
+  display:flex; justify-content:space-between; gap:16px; flex-wrap:wrap;
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <a class="brand" href="./">
+    <b>UDON<i>·</i>MAP</b>
+    <small>KAGAWA</small>
+  </a>
+  <h1>プライバシーポリシー</h1>
+  <p class="lead">うどんマップ（以下「当サイト」）における、利用者の情報の取り扱いについて定めます。</p>
+</header>
+
+<h2>記録データの取り扱い</h2>
+<p>当サイトで登録した店名・位置・訪問回数などの記録は、<strong>すべて利用者ご自身の端末内（ブラウザのローカルストレージ）にのみ保存されます。</strong></p>
+<p>これらのデータが当サイトの運営者や第三者のサーバーに送信されることはありません。運営者が利用者の記録内容を閲覧することはできません。</p>
+<div class="note">
+  データが端末内にしか存在しないため、<strong>ブラウザの閲覧履歴やサイトデータを削除すると記録も消えます。</strong>また、別の端末やブラウザに記録が引き継がれることもありません。画面右上のメニューから「データを書き出す」でファイルとして保存できますので、定期的なバックアップをおすすめします。
+</div>
+
+<h2>位置情報の利用</h2>
+<p>「現在地から追加」の機能を使用した場合のみ、ブラウザを通じて端末の位置情報を取得します。取得した位置情報は、地図の表示位置の調整と、登録する店舗の座標として端末内に保存する目的にのみ使用します。</p>
+<p>位置情報が外部に送信・保存されることはありません。取得の可否はブラウザの許可ダイアログで利用者が選択でき、拒否した場合でも他の機能は通常どおり利用できます。</p>
+
+<h2>外部サービスの利用</h2>
+<p>当サイトは、地図の表示のために以下の外部サービスを利用しています。これらのサービスへ地図タイルを要求する際、通信の性質上、利用者のIPアドレスや閲覧している地図の範囲が各サービスに送信されます。</p>
+<ul>
+  <li><a href="https://openfreemap.org/" target="_blank" rel="noopener">OpenFreeMap</a>（地図データの配信）</li>
+  <li><a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>（地図の元データ）</li>
+  <li><a href="https://unpkg.com/" target="_blank" rel="noopener">unpkg</a>（地図表示用プログラムの配信）</li>
+</ul>
+<p>各サービスにおける情報の取り扱いは、それぞれの提供元の方針に従います。</p>
+
+<h2>アクセス解析について</h2>
+<p>当サイトでは、今後、利用状況の把握のためにアクセス解析ツールを導入する場合があります。導入した場合、これらのツールはクッキーを使用して匿名のトラフィックデータを収集することがありますが、個人を特定する情報は含まれません。</p>
+<p>クッキーの使用は、ブラウザの設定により無効にすることができます。導入した際は、本ポリシーを更新のうえ、対象のサービス名を明記します。</p>
+
+<h2>広告について</h2>
+<p>当サイトでは、今後、第三者配信の広告サービスやアフィリエイトプログラムを利用する場合があります。これらの広告配信事業者は、利用者の興味に応じた広告を表示するためにクッキーを使用することがあります。</p>
+<p>導入した際は、本ポリシーを更新のうえ、利用する事業者名と、そのオプトアウト方法を案内します。</p>
+
+<h2>免責事項</h2>
+<p>当サイトに掲載される地図・店舗の位置・営業状況などの情報について、その正確性・完全性を保証するものではありません。実際の訪問にあたっては、各店舗の公式情報をご確認ください。</p>
+<p>当サイトの利用によって生じたいかなる損害についても、運営者は責任を負いかねます。記録データの消失についても同様ですので、バックアップは利用者ご自身の責任で行ってください。</p>
+
+<h2>著作権について</h2>
+<p>地図データは OpenStreetMap の貢献者によるもので、<a href="https://opendatacommons.org/licenses/odbl/" target="_blank" rel="noopener">ODbL</a> のもとで提供されています。市区町村の境界データは国土交通省 国土数値情報（行政区域データ）を加工して利用しています。</p>
+
+<h2>本ポリシーの変更</h2>
+<p>本ポリシーの内容は、必要に応じて予告なく変更することがあります。変更後の内容は、当ページに掲載した時点から効力を生じるものとします。</p>
+
+<footer>
+  <span>制定日：2026年9月3日</span>
+  <a href="./">うどんマップに戻る</a>
+</footer>
+
+</div>
+</body>
+</html>

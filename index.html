@@ -3,7 +3,36 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>讃岐うどん訪問記録</title>
+
+<title>うどんマップ｜香川のうどん屋巡りを地図に記録する無料ツール</title>
+<meta name="description" content="訪れた香川県のうどん屋を地図にピンで記録できる無料ツール。高松市・丸亀市など市町ごとの訪問状況もひと目で確認できます。登録不要・インストール不要、記録は端末内にだけ保存されます。">
+<link rel="canonical" href="https://udon-map.github.io/">
+<meta name="theme-color" content="#12161b">
+
+<!-- SNSでリンクを貼ったときの見え方 -->
+<meta property="og:type" content="website">
+<meta property="og:title" content="うどんマップ｜香川のうどん屋巡りを地図に記録">
+<meta property="og:description" content="訪れた香川県のうどん屋を地図にピンで記録。市町ごとの訪問状況もひと目でわかります。登録不要・無料。">
+<meta property="og:url" content="https://udon-map.github.io/">
+<meta property="og:image" content="https://udon-map.github.io/ogp.png">
+<meta property="og:site_name" content="うどんマップ">
+<meta property="og:locale" content="ja_JP">
+<meta name="twitter:card" content="summary_large_image">
+
+<!-- 検索エンジンにサイトの性質を伝える構造化データ -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  "name": "うどんマップ",
+  "url": "https://udon-map.github.io/",
+  "description": "訪れた香川県のうどん屋を地図に記録できる無料ツール。市町ごとの訪問状況を確認できます。",
+  "applicationCategory": "TravelApplication",
+  "operatingSystem": "Web",
+  "inLanguage": "ja",
+  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "JPY" }
+}
+</script>
 
 <!-- ▼ Leaflet（地図ライブラリ）をCDNから読み込む。この2行だけで地図が使えるようになる -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -232,15 +261,14 @@ button.active{ background:var(--amber); border-color:var(--amber); color:#1a1206
 .link-danger:hover{ color:#f08d84; }
 .popup-note{ font-size:10.5px; color:#6d747c; margin-top:10px; line-height:1.6; }
 
-/* ---------- 何もないときの案内 ---------- */
-.empty{
-  position:absolute; z-index:1100;
-  left:50%; top:50%; transform:translate(-50%,-50%);
-  padding:16px 26px; text-align:center; font-size:13px;
-  color:var(--text); pointer-events:none;
+
+.foot-link{
+  position:absolute; z-index:1200;
+  left:14px; top:auto; bottom:2px;
+  font-size:10px; color:#6a7078; text-decoration:none;
+  letter-spacing:.04em;
 }
-.empty b{ display:block; font-size:15px; font-weight:600; margin-bottom:5px; }
-.empty span{ color:var(--muted); font-size:11.5px; }
+.foot-link:hover{ color:var(--amber); }
 
 /* ---------- Leafletの部品を馴染ませる ---------- */
 .leaflet-control-zoom a{
@@ -326,10 +354,8 @@ button.active{ background:var(--amber); border-color:var(--amber); color:#1a1206
 
 <input type="file" id="file-input" accept="application/json" hidden>
 
-<div class="empty" id="empty">
-  <b>まだ1軒も記録がありません</b>
-  <span>地図を右クリック、または「現在地から追加」から</span>
-</div>
+<a class="foot-link" href="privacy.html">プライバシーポリシー</a>
+
 
 <script>
 /* =========================================================
@@ -696,7 +722,6 @@ function updateStats(){
   document.getElementById('stat-shops').textContent = list.length;
   document.getElementById('stat-visited').textContent = visited;
   document.getElementById('stat-total').textContent = total;
-  document.getElementById('empty').style.display = shops.length ? 'none' : 'block';
 }
 
 
