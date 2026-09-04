@@ -19,7 +19,6 @@
 <meta property="og:locale" content="ja_JP">
 <meta name="twitter:card" content="summary_large_image">
 
-<!-- 検索エンジンにサイトの性質を伝える構造化データ -->
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -34,26 +33,22 @@
 }
 </script>
 
-<!-- ▼ Leaflet（地図ライブラリ）をCDNから読み込む。この2行だけで地図が使えるようになる -->
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
-<!-- ▼ MapLibre（ベクタータイルを描画する）と、それをLeafletで使うための橋渡し -->
+<!-- ▼ MapLibre GL JS。地図の描画をすべてこれ1つで行う（Leafletは使わない） -->
 <link href="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.css" rel="stylesheet">
 <script src="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.js"></script>
-<script src="https://unpkg.com/@maplibre/maplibre-gl-leaflet/leaflet-maplibre-gl.js"></script>
 
 <style>
 /* =========================================================
    配色：地図は明るく、UIは浮いた暗色パネル。差し色は琥珀。
    ========================================================= */
 :root{
-  --ink:      #12161b;          /* パネルの地色 */
+  --ink:      #12161b;
   --ink-soft: rgba(18,22,27,.82);
+  --pop-bg:   rgba(18,22,27,.94);
   --line:     rgba(255,255,255,.10);
   --text:     #f1efec;
   --muted:    #99a1a9;
-  --amber:    #e8a33d;          /* 差し色（出汁の色） */
+  --amber:    #e8a33d;
   --amber-dk: #b8801f;
   --danger:   #e2685f;
   --radius:   14px;
@@ -67,11 +62,11 @@ body{
   font-family: -apple-system, "Hiragino Sans", "Noto Sans JP", "Yu Gothic UI", "Segoe UI", sans-serif;
   font-feature-settings: "palt" 1;
   color: var(--text);
-  background: #e9e9e7;
+  background: #e7e7e4;
 }
 
 #map{ position:absolute; inset:0; z-index:0; }
-#map.adding{ cursor:crosshair; }
+#map.adding canvas{ cursor:crosshair !important; }
 
 /* ---------- 浮かぶパネル共通 ---------- */
 .panel{
@@ -90,18 +85,13 @@ body{
   display:flex; align-items:center; gap:14px;
   padding:10px 12px 10px 16px;
 }
-
 .brand{ display:flex; flex-direction:column; line-height:1.15; flex-shrink:0; }
-.brand b{
-  font-size:15px; font-weight:700;
-  letter-spacing:.16em; color:var(--text);
-}
+.brand b{ font-size:15px; font-weight:700; letter-spacing:.16em; }
 .brand b i{ font-style:normal; color:var(--amber); }
 .brand small{ font-size:10px; letter-spacing:.22em; color:var(--muted); }
 
-/* エリア選択 */
 .area-wrap{ position:relative; flex-shrink:0; }
-.area-wrap::after{                      /* 自作の三角。標準の矢印は消してある */
+.area-wrap::after{
   content:''; position:absolute; right:12px; top:50%;
   width:6px; height:6px; margin-top:-4px;
   border-right:1.5px solid var(--muted); border-bottom:1.5px solid var(--muted);
@@ -112,20 +102,15 @@ select#area{
   font-family:inherit; font-size:13px; font-weight:500;
   color:var(--text); background:rgba(255,255,255,.07);
   border:1px solid var(--line); border-radius:999px;
-  padding:8px 32px 8px 14px; cursor:pointer;
-  max-width:200px;
+  padding:8px 32px 8px 14px; cursor:pointer; max-width:200px;
 }
 select#area:hover{ background:rgba(255,255,255,.12); }
 select#area:focus-visible{ outline:2px solid var(--amber); outline-offset:1px; }
 select#area option{ background:#1b2026; color:var(--text); }
 
-/* 統計 */
 .stats{ display:flex; gap:20px; margin-left:auto; padding-right:4px; }
 .stat{ text-align:right; line-height:1.1; }
-.stat b{
-  display:block; font-size:19px; font-weight:600;
-  font-variant-numeric:tabular-nums; letter-spacing:.01em;
-}
+.stat b{ display:block; font-size:19px; font-weight:600; font-variant-numeric:tabular-nums; }
 .stat span{ font-size:10px; letter-spacing:.1em; color:var(--muted); }
 .stat.accent b{ color:var(--amber); }
 
@@ -143,8 +128,7 @@ button{
   border:1px solid var(--line);
   background:var(--ink-soft);
   -webkit-backdrop-filter:blur(16px); backdrop-filter:blur(16px);
-  color:var(--text);
-  box-shadow:var(--shadow);
+  color:var(--text); box-shadow:var(--shadow);
   transition:background .15s, transform .1s;
 }
 button:hover{ background:rgba(38,44,52,.9); }
@@ -152,9 +136,7 @@ button:active{ transform:translateY(1px); }
 button:focus-visible{ outline:2px solid var(--amber); outline-offset:2px; }
 button:disabled{ opacity:.55; cursor:default; }
 
-button.primary{
-  background:var(--amber); border-color:var(--amber); color:#1a1206; font-weight:600;
-}
+button.primary{ background:var(--amber); border-color:var(--amber); color:#1a1206; font-weight:600; }
 button.primary:hover{ background:#f0b055; }
 button.primary.active{ background:#f0b055; }
 button.active{ background:var(--amber); border-color:var(--amber); color:#1a1206; font-weight:600; }
@@ -173,7 +155,7 @@ button.active{ background:var(--amber); border-color:var(--amber); color:#1a1206
 #btn-menu{ padding:10px 13px; }
 .menu{
   position:absolute; right:0; top:calc(100% + 8px);
-  min-width:180px; padding:6px; display:none; z-index:1300;
+  min-width:190px; padding:6px; display:none; z-index:1300;
 }
 .menu.open{ display:block; }
 .menu button{
@@ -182,6 +164,7 @@ button.active{ background:var(--amber); border-color:var(--amber); color:#1a1206
   border-radius:9px; padding:9px 12px; font-size:13px;
 }
 .menu button:hover{ background:rgba(255,255,255,.09); }
+.menu hr{ border:none; border-top:1px solid var(--line); margin:5px 8px; }
 
 /* ---------- ピン ---------- */
 .pin{
@@ -189,17 +172,22 @@ button.active{ background:var(--amber); border-color:var(--amber); color:#1a1206
   display:flex; align-items:center; justify-content:center;
   font-size:13px; font-weight:700; font-variant-numeric:tabular-nums;
   box-shadow:0 3px 10px rgba(10,14,20,.4);
-  transition:transform .12s;
+  transition:transform .12s; cursor:pointer;
 }
 .pin:hover{ transform:scale(1.12); }
-.pin.visited{
-  background:var(--amber); color:#1a1206;
-  border:2.5px solid #fff;
-}
-.pin.unvisited{
-  background:#fff; color:var(--amber-dk);
-  border:2.5px solid var(--amber);
-  font-size:11px;
+.pin.visited{ background:var(--amber); color:#1a1206; border:2.5px solid #fff; }
+.pin.unvisited{ background:#fff; color:var(--amber-dk); border:2.5px solid var(--amber); font-size:11px; }
+.pin.ghost{ opacity:.55; }
+
+/* 市町名のラベル */
+.area-name{
+  white-space:nowrap;
+  font-size:11.5px; font-weight:700; letter-spacing:.08em;
+  color:#4a3f30;
+  text-shadow:
+     0 0 3px rgba(255,255,255,.95), 0 0 3px rgba(255,255,255,.95),
+     0 0 7px rgba(255,255,255,.85), 0 1px 2px rgba(255,255,255,.95);
+  pointer-events:none;
 }
 
 /* 現在地 */
@@ -209,24 +197,28 @@ button.active{ background:var(--amber); border-color:var(--amber); color:#1a1206
   box-shadow:0 0 0 1px rgba(0,0,0,.2), 0 0 14px rgba(47,125,225,.7);
 }
 
-/* ---------- ポップアップ（Leafletの既定を上書き） ---------- */
-.u-popup .leaflet-popup-content-wrapper{
-  background:rgba(18,22,27,.93);
+/* ---------- ポップアップ（MapLibreの既定を上書き） ---------- */
+.u-popup .maplibregl-popup-content{
+  background:var(--pop-bg);
   -webkit-backdrop-filter:blur(16px); backdrop-filter:blur(16px);
   color:var(--text);
   border:1px solid var(--line);
   border-radius:var(--radius);
   box-shadow:0 12px 40px rgba(10,14,20,.45);
+  padding:14px 16px;
 }
-.u-popup .leaflet-popup-content{ margin:14px 16px; }
-.u-popup .leaflet-popup-tip{
-  background:rgba(18,22,27,.93);
-  border:1px solid var(--line);
-  box-shadow:none;
-}
+/* 吹き出しの三角。向きごとに色を指定する必要がある */
+.u-popup.maplibregl-popup-anchor-bottom .maplibregl-popup-tip,
+.u-popup.maplibregl-popup-anchor-bottom-left .maplibregl-popup-tip,
+.u-popup.maplibregl-popup-anchor-bottom-right .maplibregl-popup-tip{ border-top-color:var(--pop-bg); }
+.u-popup.maplibregl-popup-anchor-top .maplibregl-popup-tip,
+.u-popup.maplibregl-popup-anchor-top-left .maplibregl-popup-tip,
+.u-popup.maplibregl-popup-anchor-top-right .maplibregl-popup-tip{ border-bottom-color:var(--pop-bg); }
+.u-popup.maplibregl-popup-anchor-left .maplibregl-popup-tip{ border-right-color:var(--pop-bg); }
+.u-popup.maplibregl-popup-anchor-right .maplibregl-popup-tip{ border-left-color:var(--pop-bg); }
 
 .popup-name{ font-size:15px; font-weight:600; letter-spacing:.02em; margin-bottom:3px; }
-.popup-count{ font-size:12px; color:var(--muted); margin-bottom:11px; }
+.popup-count{ font-size:12px; color:var(--muted); margin-bottom:11px; line-height:1.6; }
 .popup-count b{ color:var(--amber); font-size:15px; font-variant-numeric:tabular-nums; }
 
 .popup-input{
@@ -240,8 +232,7 @@ button.active{ background:var(--amber); border-color:var(--amber); color:#1a1206
 
 .popup-city{
   display:flex; align-items:center; gap:7px;
-  font-size:11px; letter-spacing:.08em; color:var(--muted);
-  margin-bottom:11px;
+  font-size:11px; letter-spacing:.08em; color:var(--muted); margin-bottom:11px;
 }
 .popup-city select{
   appearance:none; -webkit-appearance:none;
@@ -261,14 +252,13 @@ button.active{ background:var(--amber); border-color:var(--amber); color:#1a1206
 .link-danger:hover{ color:#f08d84; }
 .popup-note{ font-size:10.5px; color:#6d747c; margin-top:10px; line-height:1.6; }
 
-
+/* ---------- 一覧パネル ---------- */
 .sheet{
   position:absolute; z-index:1250;
   left:12px; top:78px; bottom:78px; width:352px;
   display:none; flex-direction:column; overflow:hidden;
 }
 .sheet.open{ display:flex; }
-
 .sheet-head{ display:flex; gap:8px; padding:12px; border-bottom:1px solid var(--line); }
 .sheet-search{
   flex:1; font-family:inherit; font-size:13px; color:var(--text);
@@ -297,10 +287,7 @@ button.active{ background:var(--amber); border-color:var(--amber); color:#1a1206
 .row:hover{ background:rgba(255,255,255,.06); }
 .row-body{ flex:1; min-width:0; }
 .row-name{ font-size:13px; font-weight:500; margin-bottom:2px; }
-.row-addr{
-  font-size:10.5px; color:var(--muted);
-  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
-}
+.row-addr{ font-size:10.5px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .row-badge{
   flex-shrink:0; min-width:30px; height:26px; padding:0 8px;
   display:flex; align-items:center; justify-content:center;
@@ -315,28 +302,10 @@ button.active{ background:var(--amber); border-color:var(--amber); color:#1a1206
 .row.new .row-name{ color:#c9ccd0; }
 .sheet-none{ padding:26px 16px; text-align:center; font-size:12px; color:var(--muted); }
 
-@media (max-width:640px){
-  .sheet{ left:10px; right:10px; width:auto; top:auto; bottom:74px; height:58vh; }
-}
-
-.area-name{
-  position:absolute;
-  transform:translate(-50%,-50%);
-  white-space:nowrap;
-  font-size:11.5px; font-weight:700; letter-spacing:.08em;
-  color:#4a3f30;
-  text-shadow:
-     0 0 3px rgba(255,255,255,.95), 0 0 3px rgba(255,255,255,.95),
-     0 0 7px rgba(255,255,255,.85), 0 1px 2px rgba(255,255,255,.95);
-  pointer-events:none;
-}
-@media (max-width:640px){
-  .area-name{ font-size:10px; letter-spacing:.04em; }
-}
-
+/* ---------- 取り消しトースト ---------- */
 .toast{
   position:absolute; z-index:1400;
-  left:50%; bottom:22px; transform:translateX(-50%) translateY(0);
+  left:50%; bottom:22px; transform:translateX(-50%);
   display:flex; align-items:center; gap:14px;
   padding:11px 12px 11px 18px;
   opacity:0; pointer-events:none;
@@ -345,75 +314,47 @@ button.active{ background:var(--amber); border-color:var(--amber); color:#1a1206
 .toast.show{ opacity:1; pointer-events:auto; transform:translateX(-50%) translateY(-4px); }
 .toast-text{ font-size:13px; white-space:nowrap; }
 .toast-text b{ color:var(--amber); font-weight:600; }
-.toast button{
-  font-size:12.5px; padding:7px 14px;
-  background:rgba(255,255,255,.09); box-shadow:none;
-}
+.toast button{ font-size:12.5px; padding:7px 14px; background:rgba(255,255,255,.09); box-shadow:none; }
 .toast button:hover{ background:rgba(255,255,255,.16); }
-
-@media (max-width:640px){
-  .area-name{
-  position:absolute;
-  transform:translate(-50%,-50%);
-  white-space:nowrap;
-  font-size:11.5px; font-weight:700; letter-spacing:.08em;
-  color:#4a3f30;
-  text-shadow:
-     0 0 3px rgba(255,255,255,.95), 0 0 3px rgba(255,255,255,.95),
-     0 0 7px rgba(255,255,255,.85), 0 1px 2px rgba(255,255,255,.95);
-  pointer-events:none;
-}
-@media (max-width:640px){
-  .area-name{ font-size:10px; letter-spacing:.04em; }
-}
-
-.toast{ left:12px; right:12px; transform:translateY(0); width:auto; }
-  .toast.show{ transform:translateY(-4px); }
-  .toast-text{ white-space:normal; flex:1; }
-}
 
 .foot-link{
   position:absolute; z-index:1200;
-  left:14px; top:auto; bottom:2px;
-  font-size:10px; color:#6a7078; text-decoration:none;
-  letter-spacing:.04em;
+  left:14px; bottom:2px;
+  font-size:10px; color:#6a7078; text-decoration:none; letter-spacing:.04em;
 }
 .foot-link:hover{ color:var(--amber); }
 
-/* ---------- Leafletの部品を馴染ませる ---------- */
-.leaflet-control-zoom a{
-  background:var(--ink-soft) !important;
-  -webkit-backdrop-filter:blur(16px); backdrop-filter:blur(16px);
-  color:var(--text) !important;
-  border:1px solid var(--line) !important;
-  width:34px !important; height:34px !important; line-height:32px !important;
-}
-.leaflet-control-zoom a:first-child{ border-radius:11px 11px 0 0 !important; }
-.leaflet-control-zoom a:last-child{ border-radius:0 0 11px 11px !important; border-top:none !important; }
-.leaflet-control-zoom{ border:none !important; box-shadow:var(--shadow); }
-.leaflet-control-layers{
+/* ---------- MapLibreの部品を馴染ませる ---------- */
+.maplibregl-ctrl-group{
   background:var(--ink-soft) !important;
   -webkit-backdrop-filter:blur(16px); backdrop-filter:blur(16px);
   border:1px solid var(--line) !important;
   border-radius:11px !important;
   box-shadow:var(--shadow) !important;
-  color:var(--text);
+  overflow:hidden;
 }
-.leaflet-control-layers-toggle{
+.maplibregl-ctrl-group button{
   width:34px !important; height:34px !important;
-  filter:invert(1) brightness(1.7);
+  background:none !important; border:none !important;
+  border-radius:0 !important; box-shadow:none !important;
+  padding:0 !important;
 }
-.leaflet-control-layers-expanded{ padding:9px 13px 9px 10px !important; font-size:12px; }
-.leaflet-control-layers label{
-  display:flex; align-items:center; gap:8px;
-  padding:5px 2px; cursor:pointer; margin:0;
+.maplibregl-ctrl-group button+button{ border-top:1px solid var(--line) !important; }
+.maplibregl-ctrl-group button:hover{ background:rgba(255,255,255,.09) !important; }
+.maplibregl-ctrl-group button .maplibregl-ctrl-icon{ filter:invert(1) brightness(1.7); }
+
+.maplibregl-ctrl-attrib{
+  background:rgba(255,255,255,.82) !important;
+  font-size:10px !important; border-radius:7px 0 0 0;
 }
-.leaflet-control-layers input[type=radio]{ accent-color:var(--amber); margin:0; }
-.leaflet-control-attribution{
-  background:rgba(255,255,255,.8) !important;
-  font-size:10px !important; color:#5c6068 !important;
-  border-radius:7px 0 0 0; padding:2px 7px !important;
+.maplibregl-ctrl-attrib a{ color:#5c6068 !important; }
+
+.fallback{
+  position:absolute; inset:0; z-index:2000;
+  display:none; align-items:center; justify-content:center;
+  background:var(--ink); text-align:center; padding:32px; line-height:1.9;
 }
+.fallback.show{ display:flex; }
 
 @media (max-width:640px){
   .topbar{ flex-wrap:wrap; gap:10px; padding:10px 12px; }
@@ -424,6 +365,11 @@ button.active{ background:var(--amber); border-color:var(--amber); color:#1a1206
   .stat b{ font-size:16px; }
   .dock{ bottom:16px; left:12px; right:12px; }
   .hint{ display:none; }
+  .sheet{ left:10px; right:10px; width:auto; top:auto; bottom:74px; height:58vh; }
+  .toast{ left:12px; right:12px; transform:none; }
+  .toast.show{ transform:translateY(-4px); }
+  .toast-text{ white-space:normal; flex:1; }
+  .area-name{ font-size:10px; letter-spacing:.04em; }
 }
 </style>
 </head>
@@ -448,6 +394,9 @@ button.active{ background:var(--amber); border-color:var(--amber); color:#1a1206
   <div class="menu-wrap">
     <button id="btn-menu" aria-label="メニュー">···</button>
     <div class="menu panel" id="menu">
+      <button id="btn-style">地図のスタイルを変える</button>
+      <button id="btn-north">向きを初期状態に戻す</button>
+      <hr>
       <button id="btn-export">データを書き出す</button>
       <button id="btn-import">データを読み込む</button>
     </div>
@@ -481,30 +430,42 @@ button.active{ background:var(--amber); border-color:var(--amber); color:#1a1206
 
 <a class="foot-link" href="privacy.html">プライバシーポリシー</a>
 
+<div class="fallback panel" id="fallback">
+  <div>
+    <b>地図を表示できませんでした</b><br>
+    <span style="color:var(--muted);font-size:13px">
+      このページは WebGL という描画機能を使います。<br>
+      お使いのブラウザで有効になっているかご確認ください。
+    </span>
+  </div>
+</div>
 
 <script>
 /* =========================================================
    ① データの置き場所
    ---------------------------------------------------------
-   shops という配列に、店の情報をすべて入れて管理する。
-   1軒ぶんの形はこれ:
-     { id: "s1693", name: "山越うどん", lat: 34.2, lng: 133.9, visits: ["2026-09-03"] }
-   訪問回数は visits の要素数（visits.length）で数える。
+   shops … 自分の訪問記録（端末内に保存）
+   catalog … shops.json から読む、うどん屋の一覧
+   boundaries … kagawa.geojson から読む、市町の形
    ========================================================= */
 
-const STORAGE_KEY = 'udonmap_shops_v1';   // localStorage に保存するときの名前
+const STORAGE_KEY = 'udonmap_shops_v1';   // 保存形式は従来どおり。過去の記録をそのまま引き継ぐ
+const STYLE_KEY   = 'udonmap_style_v1';
 
-let shops = [];        // 店のデータ本体
-let markers = {};      // 地図上のピンを id で引けるようにしまっておく
-let addingMode = false; // 「店を追加」ボタンが押された状態かどうか
+let shops = [];
+let catalog = [];
+let boundaries = [];
+
+let markers = {};        // 訪問記録のピン（店のid → Marker）
+let labelMarkers = [];   // 市町名のラベル
+let meMarker = null;     // 現在地
+let ghostMarker = null;  // 登録しようとしている場所の仮ピン
+let addingMode = false;
+let styleReady = false;
 
 
 /* =========================================================
    ①-2 香川県の市町（8市9町）
-   ---------------------------------------------------------
-   緯度経度は各市町の役所の位置。
-   店を登録するとき、この中で一番近い役所の市町を「たぶんここ」
-   として初期値に入れる。外れていたら手で直せるようにしてある。
    ========================================================= */
 
 const KAGAWA = [
@@ -527,21 +488,26 @@ const KAGAWA = [
   { name: 'まんのう町', lat: 34.1608, lng: 133.8845 }
 ];
 
-// 一番近い役所の市町名を返す（あくまで推定）
+// 市町を塗り分ける色。差し色の琥珀と馴染む暖色でまとめている。
+const AREA_COLORS = [
+  '#e8a33d', '#d98c53', '#c9a24a', '#e0b15c', '#cf8f3a',
+  '#e6a95a', '#b98f5a', '#dca24d', '#c78a4a', '#f0b569',
+  '#a98456', '#e2984a', '#d1a866', '#bb9358', '#eab273',
+  '#c49b5f', '#dba54e'
+];
+
+// 一番近い役所の市町名を返す（境界データが無いときの保険）
 function guessCity(lat, lng){
-  let best = KAGAWA[0];
-  let bestDist = Infinity;
+  let best = KAGAWA[0], bestDist = Infinity;
   for (const c of KAGAWA) {
-    // 緯度1度と経度1度では距離が違うので、経度側を cos で補正する
     const dy = c.lat - lat;
     const dx = (c.lng - lng) * Math.cos(lat * Math.PI / 180);
-    const dist = dy * dy + dx * dx;              // 比べるだけなので平方根は省略
-    if (dist < bestDist) { bestDist = dist; best = c; }
+    const d = dy * dy + dx * dx;
+    if (d < bestDist) { bestDist = d; best = c; }
   }
   return best.name;
 }
 
-// <option> の並びを作る小道具
 function cityOptions(selected){
   return KAGAWA
     .map(c => `<option value="${c.name}"${c.name === selected ? ' selected' : ''}>${c.name}</option>`)
@@ -551,25 +517,20 @@ function cityOptions(selected){
 
 /* =========================================================
    ② 地図をつくる
+   ---------------------------------------------------------
+   OpenFreeMap のベクタータイルを使う。APIキー・登録・回数制限なし。
+   maxPitch:0 で「寝かせる（3D）」操作は禁止し、回転だけを許可する。
    ========================================================= */
 
-// 香川県のだいたい中央あたりを初期表示にする
-const map = L.map('map', { zoomControl: false, maxZoom: 18 }).setView([34.22, 133.95], 10);
+const STYLES = {
+  'Positron（淡いグレー）': 'https://tiles.openfreemap.org/styles/positron',
+  'Bright（標準）':         'https://tiles.openfreemap.org/styles/bright',
+  'Liberty（陰影つき）':    'https://tiles.openfreemap.org/styles/liberty'
+};
+const STYLE_NAMES = Object.keys(STYLES);
+let styleName = STYLE_NAMES.includes(localStorage.getItem(STYLE_KEY))
+              ? localStorage.getItem(STYLE_KEY) : STYLE_NAMES[0];
 
-// ズームボタンは右下へ（上部バーと重ならないように）
-L.control.zoom({ position: 'bottomright' }).addTo(map);
-
-// 地図のタイル画像（背景の地図そのもの）を OpenStreetMap から取得する。
-// attribution は出典表示で、OSMの利用条件として必須。消してはいけない。
-/* 背景の地図。OpenFreeMap のベクタータイルを使う。
-   APIキーもアカウント登録も不要で、利用回数の制限もない。
-   Positron は CARTO が作った定番のグレー基調スタイルで、OpenFreeMap が
-   同じ見た目のものを公開している。出典表示は利用条件として必須。 */
-
-const OFM_CREDIT = '&copy; <a href="https://openfreemap.org/">OpenFreeMap</a> &copy; <a href="https://www.openmaptiles.org/">OpenMapTiles</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
-const OSM_CREDIT = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
-
-// ベクタータイルは WebGL が使えないと描画できないので、先に確認しておく
 function hasWebGL(){
   try {
     const c = document.createElement('canvas');
@@ -578,154 +539,66 @@ function hasWebGL(){
   } catch (e) { return false; }
 }
 
-// OpenFreeMap のスタイルを1枚のレイヤーとして作る
-function ofm(styleName){
-  const layer = L.maplibreGL({
-    style: 'https://tiles.openfreemap.org/styles/' + styleName,
-    attribution: OFM_CREDIT
-  });
-
-  // 地図上の「高松市」「丸亀市」などの地名ラベルを消す。
-  // レイヤーIDの命名規則を推測すると外すので、IDは一切見ずに
-  // 「文字を描くレイヤー（type が symbol）」を全部消す方式にする。
-  // このアプリでは市町を色分けで示すので、地図側の文字は一切不要。
-  layer.on('add', () => {
-    const mgl = layer.getMaplibreMap ? layer.getMaplibreMap() : layer._glMap;
-    if (!mgl) return;
-
-    const hideLabels = () => {
-      let style;
-      try { style = mgl.getStyle(); } catch (e) { return; }
-      if (!style || !style.layers) return;
-      style.layers.forEach(l => {
-        if (l.type !== 'symbol') return;
-        try { mgl.setLayoutProperty(l.id, 'visibility', 'none'); } catch (e) {}
-      });
-    };
-
-    // 読み込みの進み方が環境で違うので、複数のタイミングで仕掛ける
-    mgl.on('load', hideLabels);
-    mgl.on('styledata', hideLabels);
-    mgl.on('idle', hideLabels);
-    if (mgl.isStyleLoaded && mgl.isStyleLoaded()) hideLabels();
-  });
-
-  return layer;
+if (!hasWebGL() || typeof maplibregl === 'undefined') {
+  document.getElementById('fallback').classList.add('show');
+  throw new Error('WebGL unavailable');
 }
 
-const rasterOSM = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  maxZoom: 18, attribution: OSM_CREDIT
+const map = new maplibregl.Map({
+  container: 'map',
+  style: STYLES[styleName],
+  center: [133.95, 34.22],
+  zoom: 9,
+  maxPitch: 0,                 // 傾け（3D表示）は使わない
+  attributionControl: { compact: true }
 });
 
-let baseLayers;
-if (hasWebGL() && typeof L.maplibreGL === 'function') {
-  baseLayers = {
-    'Positron（淡いグレー）': ofm('positron'),
-    'Bright（標準）':         ofm('bright'),
-    'Liberty（陰影つき）':    ofm('liberty'),
-    'OpenStreetMap':          rasterOSM
-  };
-} else {
-  // WebGLが使えない環境では、従来のラスタータイルだけにする
-  baseLayers = { 'OpenStreetMap': rasterOSM };
-}
-
-// 前回選んだスタイルを覚えておく
-const TILE_KEY = 'udonmap_tile_v2';
-const savedTile = localStorage.getItem(TILE_KEY);
-const firstTile = baseLayers[savedTile] ? savedTile : Object.keys(baseLayers)[0];
-
-baseLayers[firstTile].addTo(map);
-if (Object.keys(baseLayers).length > 1) {
-  L.control.layers(baseLayers, null, { position: 'bottomright' }).addTo(map);
-}
-map.on('baselayerchange', (e) => localStorage.setItem(TILE_KEY, e.name));
-
-// 地図の移動範囲は、境界データを読み込んだあとに県境から正確に決める（②-2内）。
-// ドラッグで範囲外へ出そうになったら押し戻す。
-map.on('drag', () => {
-  const b = map.options.maxBounds;
-  if (b) map.panInsideBounds(b, { animate: false });
-});
+map.addControl(new maplibregl.NavigationControl({ showCompass: true, visualizePitch: false }), 'bottom-right');
+map.dragRotate.enable();
+map.touchZoomRotate.enableRotation();
 
 
 /* =========================================================
-   ②-2 市町の境界を読み込む
+   ②-2 地名ラベルを消す
    ---------------------------------------------------------
-   kagawa.geojson に香川県8市9町の形が入っている（約44KB）。
-   ※ fetch を使うので file:// では読めない。localhost かHTTPSで開くこと。
+   レイヤーIDの命名を推測すると外すので、IDは見ずに
+   「文字を描くレイヤー（type が symbol）」を全部消す。
    ========================================================= */
-
-let boundaries = [];        // 市町の形（GeoJSONのfeatureの配列）
-let highlightLayer = null;  // 選択中の市町の縁取り
-let maskLayer = null;       // 選択外を暗くする覆い
-let choropleth = null;      // 「香川県全体」のときに出す、色分けされた市町の一覧
-let prefMask = null;        // 香川県の外を塗りつぶして隠す覆い
-let areaLabels = null;      // 市町名のラベル
-
-/* 香川県の外側を完全に隠す。
-   大きな四角を敷き、17市町の形すべてを「穴」としてくり抜くことで、
-   岡山・徳島・愛媛などの県外が地図に出てこないようにする。 */
-function drawPrefMask(){
-  if (prefMask) return;
-
-  // 全市町の外周リングを集めて穴にする（GeoJSONは[経度,緯度]なので入れ替える）
-  const holes = [];
-  boundaries.forEach(f => {
-    f.geometry.coordinates.forEach(poly => {
-      holes.push(poly[0].map(p => [p[1], p[0]]));
-    });
-  });
-
-  prefMask = L.polygon(
-    [[[85, -180], [85, 180], [-85, 180], [-85, -180]], ...holes],
-    {
-      stroke: false,
-      fillColor: '#e7e7e4',   // 地図の余白と馴染む無彩色。不透明にして完全に隠す
-      fillOpacity: 1,
-      interactive: false      // クリックは地図側に通す
-    }
-  ).addTo(map);
-  prefMask.bringToBack();
+function hideBaseLabels(){
+  const style = map.getStyle();
+  if (!style || !style.layers) return;
+  for (const l of style.layers) {
+    if (l.type !== 'symbol') continue;
+    if (l.id.startsWith('udon-')) continue;      // 自分で足したものは残す
+    try { map.setLayoutProperty(l.id, 'visibility', 'none'); } catch (e) {}
+  }
 }
 
-// 17市町を塗り分けるための配色。似た色が隣り合わないよう、
-// 少しずつ色相をずらした暖色系でまとめている（差し色の琥珀と馴染むように）。
-const AREA_COLORS = [
-  '#e8a33d', '#d98c53', '#c9a24a', '#e0b15c', '#cf8f3a',
-  '#e6a95a', '#b98f5a', '#dca24d', '#c78a4a', '#f0b569',
-  '#a98456', '#e2984a', '#d1a866', '#bb9358', '#eab273',
-  '#c49b5f', '#dba54e'
-];
 
-fetch('kagawa.geojson')
-  .then(r => r.json())
-  .then(data => {
-    boundaries = data.features;
+/* =========================================================
+   ②-3 香川県の形にまつわる計算
+   ========================================================= */
 
-    // 境界が読めたので、推定で入れていたエリアを正確な判定に置き換える。
-    // ただし手で直したもの（cityFixed）はそのまま尊重する。
-    let changed = false;
-    shops.forEach(s => {
-      if (s.cityFixed) return;
-      const c = cityAt(s.lat, s.lng);
-      if (c !== s.city) { s.city = c; changed = true; }
-    });
-    if (changed) save();
+// 香川県の外を隠すための「大きな四角に穴を開けた図形」を作る
+function maskGeoJSON(features){
+  const OUTER = [[128, 30], [140, 30], [140, 40], [128, 40], [128, 30]];
+  const holes = [];
+  features.forEach(f => f.geometry.coordinates.forEach(poly => holes.push(poly[0])));
+  return { type: 'Feature', properties: {},
+           geometry: { type: 'Polygon', coordinates: [OUTER, ...holes] } };
+}
 
-    // 県外を隠す覆いを敷き、移動できる範囲を実際の県境から決める
-    drawPrefMask();
-    const b = L.geoJSON({ type: 'FeatureCollection', features: boundaries }).getBounds();
-    map.setMaxBounds(b.pad(0.08));      // 県境ぎりぎり＋わずかな余白まで
-    map.setMinZoom(map.getBoundsZoom(b));  // 県全体が収まるズームより引けないようにする
-
-    redraw();
-    applyArea();
-  })
-  .catch(() => {
-    console.warn('kagawa.geojson を読み込めませんでした。エリアの強調表示は使えません。');
-  });
-
+// 全市町を囲む範囲（[[西,南],[東,北]]）
+function boundsOf(features){
+  let w = 180, s = 90, e = -180, n = -90;
+  features.forEach(f => f.geometry.coordinates.forEach(poly => poly[0].forEach(p => {
+    if (p[0] < w) w = p[0];
+    if (p[0] > e) e = p[0];
+    if (p[1] < s) s = p[1];
+    if (p[1] > n) n = p[1];
+  })));
+  return [[w, s], [e, n]];
+}
 
 /* 点が多角形の中にあるかを調べる（レイキャスティング法）。
    その点から右へ半直線を伸ばし、辺と交差した回数が奇数なら内側。 */
@@ -735,30 +608,24 @@ function pointInRing(lat, lng, ring){
     const xi = ring[i][0], yi = ring[i][1];
     const xj = ring[j][0], yj = ring[j][1];
     if (((yi > lat) !== (yj > lat)) &&
-        (lng < (xj - xi) * (lat - yi) / (yj - yi) + xi)) {
-      inside = !inside;
-    }
+        (lng < (xj - xi) * (lat - yi) / (yj - yi) + xi)) inside = !inside;
   }
   return inside;
 }
 
-// 座標がどの市町に入るかを返す。境界データがまだ無ければ推定に頼る。
 function cityAt(lat, lng){
   for (const f of boundaries) {
     for (const poly of f.geometry.coordinates) {
-      if (!pointInRing(lat, lng, poly[0])) continue;   // 外周の内側か
-      let inHole = false;                              // 穴（飛び地の抜け）に入っていないか
-      for (let k = 1; k < poly.length; k++) {
-        if (pointInRing(lat, lng, poly[k])) inHole = true;
-      }
+      if (!pointInRing(lat, lng, poly[0])) continue;
+      let inHole = false;
+      for (let k = 1; k < poly.length; k++) if (pointInRing(lat, lng, poly[k])) inHole = true;
       if (!inHole) return f.properties.name;
     }
   }
-  return guessCity(lat, lng);   // 海の上など、どの市町にも入らないとき
+  return guessCity(lat, lng);
 }
 
-/* 多角形の重心を求める（面積で重み付けするので、単純な平均より中央に寄る）。
-   ring は [経度, 緯度] の配列。戻り値は [緯度, 経度]。 */
+/* 多角形の重心（面積で重み付け）。ラベルを図形の内側に置くために使う。 */
 function ringCentroid(ring){
   let a = 0, x = 0, y = 0;
   for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
@@ -768,12 +635,10 @@ function ringCentroid(ring){
     y += (ring[j][1] + ring[i][1]) * f;
   }
   a *= 0.5;
-  if (!a) return null;
-  return [y / (6 * a), x / (6 * a)];
+  return a ? [x / (6 * a), y / (6 * a)] : null;   // [経度, 緯度]
 }
 
-/* 市町の代表点を返す。離島を持つ市町（高松市など）は本土側に置きたいので、
-   一番大きい塊の重心を採る。 */
+// 離島を持つ市町は本土側に置きたいので、一番大きい塊の重心を採る
 function featureCenter(f){
   let best = null, bestArea = 0;
   f.geometry.coordinates.forEach(poly => {
@@ -791,132 +656,30 @@ function featureCenter(f){
   return best ? ringCentroid(best) : null;
 }
 
-// 市町名のラベルを作る。クリックは下の色分け図形に通すので pointer-events は無効。
-function makeAreaLabels(){
-  const group = L.layerGroup();
-  boundaries.forEach(f => {
-    const c = featureCenter(f);
-    if (!c) return;
-    L.marker(c, {
-      icon: L.divIcon({
-        className: '',
-        html: `<div class="area-name">${f.properties.name}</div>`,
-        iconSize: [0, 0]
-      }),
-      interactive: false
-    }).addTo(group);
-  });
-  return group;
-}
 
-// 「香川県全体」のとき、17市町を色分けして表示する。
-// クリックすると、そのままエリア選択で選んだのと同じ扱いになる。
-function drawChoropleth(){
-  if (choropleth) return;   // 一度作れば使い回す
-  choropleth = L.geoJSON({ type: 'FeatureCollection', features: boundaries }, {
-    style: (f) => ({
-      color: AREA_COLORS[KAGAWA.findIndex(c => c.name === f.properties.name) % AREA_COLORS.length],
-      weight: 1.5,
-      opacity: .85,
-      fillColor: AREA_COLORS[KAGAWA.findIndex(c => c.name === f.properties.name) % AREA_COLORS.length],
-      fillOpacity: .16
-    }),
-    onEachFeature: (f, layer) => {
-      layer.on('mouseover', () => layer.setStyle({ fillOpacity: .32, weight: 2.5 }));
-      layer.on('mouseout',  () => choropleth.resetStyle(layer));
-      layer.on('click', () => {
-        areaSelect.value = f.properties.name;
-        areaSelect.dispatchEvent(new Event('change'));
-      });
-    }
-  });
-  choropleth.addTo(map);
-  choropleth.bringToBack();   // ピンより下、地図タイルより上に敷く
-}
-
-// 選択中のエリアを強調し、それ以外を暗くする
-function applyArea(){
-  if (highlightLayer) { map.removeLayer(highlightLayer); highlightLayer = null; }
-  if (maskLayer)      { map.removeLayer(maskLayer);      maskLayer = null; }
-  if (choropleth)     { map.removeLayer(choropleth); }
-  if (areaLabels)     { map.removeLayer(areaLabels); }
-  const area = areaSelect.value;
-
-  // 「香川県全体」のときは、色分けした市町の一覧を出して県全体が収まるように引く
-  if (area === 'all') {
-    if (boundaries.length) {
-      drawChoropleth();
-      choropleth.addTo(map);
-      choropleth.bringToBack();
-      if (prefMask) prefMask.bringToBack();   // 県外マスクは常に一番下
-
-      if (!areaLabels) areaLabels = makeAreaLabels();
-      areaLabels.addTo(map);
-
-      map.fitBounds(choropleth.getBounds(), { padding: [8, 8] });
-    }
-    return;
-  }
-
-  const f = boundaries.find(b => b.properties.name === area);
-  if (!f) return;
-
-  // ① 選んだ市町の形を「穴」にした大きな四角を敷いて、外側だけを暗くする
-  const holes = f.geometry.coordinates.map(
-    poly => poly[0].map(p => [p[1], p[0]])       // GeoJSONは[経度,緯度]なので入れ替える
-  );
-  maskLayer = L.polygon(
-    [[[85, -180], [85, 180], [-85, 180], [-85, -180]], ...holes],
-    { stroke: false, fillColor: '#0e1319', fillOpacity: .42 }
-  ).addTo(map);
-
-  // 選択中の市町の外側（暗くなっている部分）をクリックすると、選択を解除して
-  // 「香川県全体」に戻す。地図から店を登録するモード中は誤操作になるので働かせない。
-  maskLayer.on('click', () => {
-    if (addingMode) return;
-    areaSelect.value = 'all';
-    areaSelect.dispatchEvent(new Event('change'));
-  });
-
-  // ② 選んだ市町を琥珀色で縁取る
-  highlightLayer = L.geoJSON(f, {
-    style: { color: '#e8a33d', weight: 3, opacity: 1, fillColor: '#e8a33d', fillOpacity: .07 },
-    interactive: false
-  }).addTo(map);
-
-  if (prefMask) prefMask.bringToBack();      // 県外マスクは常に一番下
-
-  // ③ その市町の全体が画面に収まるように合わせる（ピンの位置は考慮しない）
-  map.fitBounds(highlightLayer.getBounds(), { padding: [30, 30] });
+/* =========================================================
+   ②-4 画面の縦横比に合わせて地図の向きを決める
+   ---------------------------------------------------------
+   香川県は東西に長い。縦長の画面ではそのままだと上下が余るので、
+   東西の軸が縦になるよう回して、画面を目いっぱい使う。
+   ========================================================= */
+function autoBearing(){
+  const el = map.getContainer();
+  const portrait = el.clientHeight > el.clientWidth;
+  return portrait ? 90 : 0;      // 縦長の画面のときだけ、東を上に向ける
 }
 
 
 /* =========================================================
    ③ 保存と読み込み（localStorage）
-   ---------------------------------------------------------
-   localStorage は「ブラウザの中の小さな保管庫」。
-   文字列しか入らないので、JSON.stringify で文字列に変換して保存し、
-   取り出すときは JSON.parse でオブジェクトに戻す。
    ========================================================= */
 
-function save(){
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(shops));
-}
+function save(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(shops)); }
 
 function load(){
   const saved = localStorage.getItem(STORAGE_KEY);
-  if (saved) {
-    try {
-      shops = JSON.parse(saved);
-    } catch (e) {
-      // 保存データが壊れていたときは、空から始める
-      shops = [];
-    }
-  }
-  // エリア機能を入れる前に登録した店には city がないので、ここで補う
-  shops.forEach(s => {
-    if (!s.city) s.city = guessCity(s.lat, s.lng);
-  });
+  if (saved) { try { shops = JSON.parse(saved); } catch (e) { shops = []; } }
+  shops.forEach(s => { if (!s.city) s.city = guessCity(s.lat, s.lng); });
 }
 
 
@@ -924,22 +687,14 @@ function load(){
    ④ ピンを描く
    ========================================================= */
 
-// ピンの見た目をつくる。訪問済みなら藍で塗り、回数を数字で出す。
-function makeIcon(shop){
-  const count = shop.visits.length;
-  const cls = count > 0 ? 'visited' : 'unvisited';
-  const label = count > 0 ? count : '—';
-  return L.divIcon({
-    className: '',                         // Leaflet既定の枠を消す
-    html: `<div class="pin ${cls}">${label}</div>`,
-    iconSize: [32, 32],
-    iconAnchor: [16, 16],                  // 円の中心を座標に合わせる
-    popupAnchor: [0, -18]
-  });
+function pinElement(count, ghost){
+  const el = document.createElement('div');
+  el.className = 'pin ' + (count > 0 ? 'visited' : 'unvisited') + (ghost ? ' ghost' : '');
+  el.textContent = count > 0 ? count : (ghost ? '' : '—');
+  return el;
 }
 
-// ポップアップ（ピンをクリックしたときに出る吹き出し）の中身
-function makePopup(shop){
+function makePopupHTML(shop){
   const count = shop.visits.length;
   const last = count > 0 ? `　最終訪問 ${shop.visits[count - 1]}` : '';
   return `
@@ -956,18 +711,18 @@ function makePopup(shop){
   `;
 }
 
-// 1軒ぶんのピンを地図に置く
 function drawShop(shop){
-  const marker = L.marker([shop.lat, shop.lng], {
-    icon: makeIcon(shop),
-    draggable: true            // GPSのずれを手で直せるようにする
+  const marker = new maplibregl.Marker({
+    element: pinElement(shop.visits.length),
+    draggable: true                       // GPSや概算のずれを手で直せるようにする
   })
-    .addTo(map)
-    .bindPopup(makePopup(shop), { className: 'u-popup' });
+    .setLngLat([shop.lng, shop.lat])
+    .setPopup(new maplibregl.Popup({ closeButton: false, className: 'u-popup', maxWidth: '270px' })
+                .setHTML(makePopupHTML(shop)))
+    .addTo(map);
 
-  // ドラッグが終わったら、新しい座標をデータに書き戻して保存する
   marker.on('dragend', () => {
-    const p = marker.getLatLng();
+    const p = marker.getLngLat();
     shop.lat = p.lat;
     shop.lng = p.lng;
     save();
@@ -976,15 +731,23 @@ function drawShop(shop){
   markers[shop.id] = marker;
 }
 
-const areaSelect = document.getElementById('area');
+function clearMarkers(){
+  for (const id in markers) markers[id].remove();
+  markers = {};
+}
 
-// いま画面に出すべき店の一覧を返す（エリアで絞り込む）
+function redraw(){
+  clearMarkers();
+  refreshAreaOptions();
+  visibleShops().forEach(drawShop);
+  updateStats();
+}
+
 function visibleShops(){
   const area = areaSelect.value;
   return area === 'all' ? shops : shops.filter(s => s.city === area);
 }
 
-// エリアのプルダウンの中身を作り直す。8市9町をすべて並べ、軒数を添える。
 function refreshAreaOptions(){
   const current = areaSelect.value || 'all';
   areaSelect.innerHTML =
@@ -993,110 +756,305 @@ function refreshAreaOptions(){
       const n = shops.filter(s => s.city === c.name).length;
       return `<option value="${c.name}">${c.name}（${n}軒）</option>`;
     }).join('');
-  areaSelect.value = current;                   // 選択状態を保つ
+  areaSelect.value = current;
 }
 
-// 全部消して描き直す（データが変わったら毎回これを呼ぶ）
-function redraw(){
-  for (const id in markers) {
-    map.removeLayer(markers[id]);
+function updateStats(){
+  const list = visibleShops();
+  document.getElementById('stat-shops').textContent = list.length;
+  document.getElementById('stat-visited').textContent = list.filter(s => s.visits.length > 0).length;
+  document.getElementById('stat-total').textContent = list.reduce((n, s) => n + s.visits.length, 0);
+}
+
+
+/* =========================================================
+   ⑤ 地図に市町の色分け・マスク・強調を追加する
+   ---------------------------------------------------------
+   MapLibre では「データ（source）」と「描き方（layer）」を分けて登録する。
+   スタイルを切り替えると全部消えるので、まとめてやり直せるようにしてある。
+   ========================================================= */
+
+function installLayers(){
+  if (!boundaries.length || !map.isStyleLoaded()) return;
+
+  hideBaseLabels();
+
+  // --- データを登録 ---
+  if (!map.getSource('udon-kagawa')) {
+    map.addSource('udon-kagawa', {
+      type: 'geojson',
+      data: { type: 'FeatureCollection', features: boundaries },
+      promoteId: 'name'                  // マウスを乗せた市町を識別するため
+    });
   }
-  markers = {};
-  refreshAreaOptions();
-  visibleShops().forEach(drawShop);
-  updateStats();
+  if (!map.getSource('udon-mask')) {
+    map.addSource('udon-mask', { type: 'geojson', data: maskGeoJSON(boundaries) });
+  }
+  if (!map.getSource('udon-dim')) {
+    map.addSource('udon-dim', { type: 'geojson', data: maskGeoJSON(boundaries) });
+  }
+
+  // 市町名 → 色 の対応表を式として組み立てる
+  const colorExpr = ['match', ['get', 'name']];
+  KAGAWA.forEach((c, i) => colorExpr.push(c.name, AREA_COLORS[i % AREA_COLORS.length]));
+  colorExpr.push('#cccccc');
+
+  // --- 描き方を登録（下から順に）---
+  if (!map.getLayer('udon-outside')) {
+    map.addLayer({                        // ① 県外を完全に隠す
+      id: 'udon-outside', type: 'fill', source: 'udon-mask',
+      paint: { 'fill-color': '#e7e7e4', 'fill-opacity': 1 }
+    });
+  }
+  if (!map.getLayer('udon-city-fill')) {
+    map.addLayer({                        // ② 市町の色分け
+      id: 'udon-city-fill', type: 'fill', source: 'udon-kagawa',
+      paint: {
+        'fill-color': colorExpr,
+        'fill-opacity': ['case', ['boolean', ['feature-state', 'hover'], false], 0.34, 0.17]
+      }
+    });
+  }
+  if (!map.getLayer('udon-city-line')) {
+    map.addLayer({                        // ③ 市町の境界線
+      id: 'udon-city-line', type: 'line', source: 'udon-kagawa',
+      paint: { 'line-color': colorExpr, 'line-width': 1.4, 'line-opacity': 0.9 }
+    });
+  }
+  if (!map.getLayer('udon-dim')) {
+    map.addLayer({                        // ④ 選択中の市町以外を暗くする
+      id: 'udon-dim', type: 'fill', source: 'udon-dim',
+      layout: { visibility: 'none' },
+      paint: { 'fill-color': '#0e1319', 'fill-opacity': 0.42 }
+    });
+  }
+  if (!map.getLayer('udon-sel-line')) {
+    map.addLayer({                        // ⑤ 選択中の市町の縁取り
+      id: 'udon-sel-line', type: 'line', source: 'udon-kagawa',
+      filter: ['==', ['get', 'name'], ''],
+      paint: { 'line-color': '#e8a33d', 'line-width': 3 }
+    });
+  }
+
+  styleReady = true;
+  applyArea();
 }
 
-// エリアを切り替えたら、描き直してその市町を強調する
+// 市町の上にマウスを乗せたときの反応
+let hovered = null;
+map.on('mousemove', 'udon-city-fill', (e) => {
+  if (areaSelect.value !== 'all') return;
+  map.getCanvas().style.cursor = 'pointer';
+  if (hovered) map.setFeatureState({ source: 'udon-kagawa', id: hovered }, { hover: false });
+  hovered = e.features[0].id;
+  map.setFeatureState({ source: 'udon-kagawa', id: hovered }, { hover: true });
+});
+map.on('mouseleave', 'udon-city-fill', () => {
+  map.getCanvas().style.cursor = '';
+  if (hovered) map.setFeatureState({ source: 'udon-kagawa', id: hovered }, { hover: false });
+  hovered = null;
+});
+
+// 市町をクリック＝エリア選択で選んだのと同じ扱い
+map.on('click', 'udon-city-fill', (e) => {
+  if (addingMode || areaSelect.value !== 'all') return;
+  areaSelect.value = e.features[0].properties.name;
+  areaSelect.dispatchEvent(new Event('change'));
+});
+
+// 選択中に、暗くなっている外側をクリックすると選択解除
+map.on('click', 'udon-dim', (e) => {
+  if (addingMode || areaSelect.value === 'all') return;
+  areaSelect.value = 'all';
+  areaSelect.dispatchEvent(new Event('change'));
+});
+
+
+/* 選択中のエリアに合わせて、表示と地図の位置を切り替える */
+function applyArea(){
+  if (!styleReady) return;
+  const area = areaSelect.value;
+
+  labelMarkers.forEach(m => m.remove());
+  labelMarkers = [];
+
+  if (area === 'all') {
+    map.setLayoutProperty('udon-city-fill', 'visibility', 'visible');
+    map.setLayoutProperty('udon-city-line', 'visibility', 'visible');
+    map.setLayoutProperty('udon-dim', 'visibility', 'none');
+    map.setFilter('udon-sel-line', ['==', ['get', 'name'], '']);
+
+    // 市町名のラベルを置く（クリックは下の図形に通す）
+    boundaries.forEach(f => {
+      const c = featureCenter(f);
+      if (!c) return;
+      const el = document.createElement('div');
+      el.className = 'area-name';
+      el.textContent = f.properties.name;
+      labelMarkers.push(new maplibregl.Marker({ element: el }).setLngLat(c).addTo(map));
+    });
+
+    map.fitBounds(boundsOf(boundaries), { padding: 14, bearing: autoBearing(), duration: 600 });
+    return;
+  }
+
+  const f = boundaries.find(b => b.properties.name === area);
+  if (!f) return;
+
+  // 選んだ市町だけを穴にした覆いを作り直して、外側を暗くする
+  map.getSource('udon-dim').setData(maskGeoJSON([f]));
+  map.setLayoutProperty('udon-dim', 'visibility', 'visible');
+  map.setLayoutProperty('udon-city-fill', 'visibility', 'none');
+  map.setLayoutProperty('udon-city-line', 'visibility', 'none');
+  map.setFilter('udon-sel-line', ['==', ['get', 'name'], area]);
+
+  map.fitBounds(boundsOf([f]), { padding: 40, bearing: autoBearing(), duration: 600 });
+}
+
+
+/* =========================================================
+   ⑥ 起動処理
+   ========================================================= */
+
+map.on('load', () => {
+  hideBaseLabels();
+
+  Promise.all([
+    fetch('kagawa.geojson').then(r => r.json()).catch(() => null),
+    fetch('shops.json').then(r => r.json()).catch(() => null)
+  ]).then(([geo, cat]) => {
+    if (cat) catalog = cat;
+    if (!geo) { console.warn('kagawa.geojson を読み込めませんでした'); return; }
+
+    boundaries = geo.features;
+
+    // 境界が読めたので、エリアを正確な判定に置き換える。
+    // ただし手で直したもの（cityFixed）は尊重する。
+    let changed = false;
+    shops.forEach(s => {
+      if (s.cityFixed) return;
+      const c = cityAt(s.lat, s.lng);
+      if (c !== s.city) { s.city = c; changed = true; }
+    });
+    if (changed) save();
+
+    // 香川県の外へ出られないようにする
+    const b = boundsOf(boundaries);
+    // 回転時は画面の四隅が県境の外にはみ出すので、制限は余裕を持たせる。
+    // 県外そのものはマスク（udon-outside）で隠しているため、これで十分。
+    map.setMaxBounds([[b[0][0] - 0.5, b[0][1] - 0.4], [b[1][0] + 0.5, b[1][1] + 0.4]]);
+
+    installLayers();
+    redraw();
+  });
+});
+
+// スタイルを切り替えたときは、自分の追加分をまとめて入れ直す
+map.on('styledata', () => {
+  if (!boundaries.length) return;
+  if (map.isStyleLoaded() && !map.getLayer('udon-outside')) installLayers();
+});
+
+// 画面を回したときなど、縦横比が変わったら向きを取り直す
+let resizeTimer = null;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => { if (styleReady) applyArea(); }, 300);
+});
+
+
+/* =========================================================
+   ⑦ エリア選択
+   ========================================================= */
+
+const areaSelect = document.getElementById('area');
+
 areaSelect.addEventListener('change', () => {
   redraw();
   applyArea();
   if (sheet.classList.contains('open')) renderSheet();
 });
 
-// ヘッダーの数字を更新する（表示中のエリアぶんを集計する）
-function updateStats(){
-  const list = visibleShops();
-  const visited = list.filter(s => s.visits.length > 0).length;
-  const total = list.reduce((sum, s) => sum + s.visits.length, 0);
-  document.getElementById('stat-shops').textContent = list.length;
-  document.getElementById('stat-visited').textContent = visited;
-  document.getElementById('stat-total').textContent = total;
-}
-
 
 /* =========================================================
-   ⑤ 操作：店を追加する
+   ⑧ 店を登録する（地図から／右クリック／現在地）
    ========================================================= */
 
 const btnAdd = document.getElementById('btn-add');
 const hint = document.getElementById('hint');
 
 btnAdd.addEventListener('click', () => {
-  addingMode = !addingMode;                       // 押すたびにオン・オフを切り替える
+  addingMode = !addingMode;
   btnAdd.classList.toggle('active', addingMode);
   btnAdd.textContent = addingMode ? '追加をやめる' : '地図から追加';
   document.getElementById('map').classList.toggle('adding', addingMode);
   hint.textContent = addingMode
     ? '地図上で、店のある場所をクリックしてください'
-    : 'PCなら地図を右クリックするだけで登録できます';
+    : '地図を右クリックしても登録できます';
 });
+
+// 左クリック（追加モード中のみ）
+map.on('click', (e) => {
+  if (!addingMode) return;
+  addShopAt(e.lngLat.lat, e.lngLat.lng);
+  btnAdd.click();
+});
+
+// 右クリックはいつでも
+map.on('contextmenu', (e) => {
+  addShopAt(e.lngLat.lat, e.lngLat.lng);
+});
+
+let serial = 0;
 
 /* 指定した座標に、店名を入力するポップアップを開く。
    地図クリック・右クリック・現在地の3か所から呼ばれる共通の処理。 */
 function addShopAt(lat, lng, title){
-  // ① 登録予定の位置に、うすい仮のピンを置いて場所をわかりやすくする
-  const ghost = L.marker([lat, lng], {
-    icon: makeIcon({ visits: [] }),
-    opacity: 0.55,
-    interactive: false
-  }).addTo(map);
+  if (ghostMarker) ghostMarker.remove();
 
-  // ② 入力欄つきのポップアップを組み立てる
-  const html = `
-    <div class="popup-name">${title || 'この場所に登録'}</div>
-    <input type="text" class="popup-input" id="new-name" placeholder="店名" autocomplete="off">
-    <div class="popup-city">エリア
-      <select id="new-city">${cityOptions(cityAt(lat, lng))}</select>
-    </div>
-    <div class="popup-actions">
-      <button id="new-save">登録する</button>
-      <button id="new-cancel" class="link-danger">やめる</button>
-    </div>
-    <div class="popup-note">エリアは位置から自動判定しています。違っていれば選び直してください</div>
-  `;
+  // 登録予定の位置に、うすい仮のピンを置く
+  ghostMarker = new maplibregl.Marker({ element: pinElement(0, true) })
+    .setLngLat([lng, lat]).addTo(map);
 
-  const popup = L.popup({ closeButton: false, minWidth: 215, className: 'u-popup' })
-    .setLatLng([lat, lng])
-    .setContent(html)
-    .openOn(map);
+  const popup = new maplibregl.Popup({ closeButton: false, className: 'u-popup', maxWidth: '270px' })
+    .setLngLat([lng, lat])
+    .setHTML(`
+      <div class="popup-name">${title || 'この場所に登録'}</div>
+      <input type="text" class="popup-input" id="new-name" placeholder="店名" autocomplete="off">
+      <div class="popup-city">エリア
+        <select id="new-city">${cityOptions(cityAt(lat, lng))}</select>
+      </div>
+      <div class="popup-actions">
+        <button id="new-save">登録する</button>
+        <button id="new-cancel" class="link-danger">やめる</button>
+      </div>
+      <div class="popup-note">エリアは位置から自動判定しています。違っていれば選び直してください</div>
+    `)
+    .addTo(map);
 
-  // ③ ポップアップが閉じられたら、仮のピンも必ず片づける
-  popup.on('remove', () => map.removeLayer(ghost));
+  // どんな閉じ方をしても、仮のピンは必ず片づける
+  popup.on('close', () => {
+    if (ghostMarker) { ghostMarker.remove(); ghostMarker = null; }
+  });
 
-  // ④ 中の部品を掴む。openOn した直後には画面に出ているので取得できる。
   const input = document.getElementById('new-name');
-  input.focus();
+  if (!isTouch) input.focus();
 
   function commit(){
     const name = input.value.trim();
-    if (!name) { input.focus(); return; }         // 空のままなら何もしない
+    if (!name) { input.focus(); return; }
 
-    const id = 's' + Date.now();                   // 今の時刻をIDに使う（重複しない）
+    const id = 's' + Date.now() + '_' + (serial++);
     shops.push({
-      id: id,
-      name: name,
-      lat: lat,
-      lng: lng,
+      id, name, lat, lng,
       city: document.getElementById('new-city').value,
       visits: [today()]
     });
 
     save();
-    map.closePopup(popup);                         // 入力用ポップアップを閉じる
+    popup.remove();
     redraw();
-    // 絞り込み中で画面に出ていない場合もあるので、あるときだけ開く
-    if (markers[id]) markers[id].openPopup();
+    if (markers[id]) markers[id].togglePopup();
 
     showUndo(name, () => {
       shops = shops.filter(s => s.id !== id);
@@ -1106,57 +1064,26 @@ function addShopAt(lat, lng, title){
   }
 
   document.getElementById('new-save').addEventListener('click', commit);
-  document.getElementById('new-cancel').addEventListener('click', () => map.closePopup(popup));
-
-  // Enterキーでも登録できるようにする
+  document.getElementById('new-cancel').addEventListener('click', () => popup.remove());
   input.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') commit();
-    if (e.key === 'Escape') map.closePopup(popup);
+    if (e.key === 'Escape') popup.remove();
   });
 }
 
-// 地図が左クリックされたとき。追加モードのときだけ反応する。
-map.on('click', (e) => {
-  if (!addingMode) return;
-  addShopAt(e.latlng.lat, e.latlng.lng);
-  btnAdd.click();                                  // 追加モードを自動で解除
-});
 
-// 地図が右クリックされたとき。モードに関係なく、その場で追加できる。
-map.on('contextmenu', (e) => {
-  addShopAt(e.latlng.lat, e.latlng.lng);
-});
-
-// ブラウザ標準の右クリックメニューが出ないようにする
-map.getContainer().addEventListener('contextmenu', (e) => e.preventDefault());
-
-
-/* =========================================================
-   ⑤-2 操作：現在地から店を追加する
-   ---------------------------------------------------------
-   navigator.geolocation はブラウザに最初から入っている機能。
-   getCurrentPosition(成功したときの処理, 失敗したときの処理, 設定)
-   の形で呼ぶと、端末が測位して結果を渡してくれる。
-   ※ HTTPS か http://localhost で開かないと動かない（後述）
-   ========================================================= */
-
-let meMarker = null;   // 現在地を示す青い点
-let meCircle = null;   // 測位精度の範囲を示す円
+/* ---------- 現在地から追加 ---------- */
 
 const btnHere = document.getElementById('btn-here');
 
 btnHere.addEventListener('click', () => {
-  if (!navigator.geolocation) {
-    alert('このブラウザは位置情報に対応していません。');
-    return;
-  }
+  if (!navigator.geolocation) { alert('このブラウザは位置情報に対応していません。'); return; }
   btnHere.disabled = true;
   btnHere.innerHTML = '<span class="dot"></span>現在地を取得中…';
-
   navigator.geolocation.getCurrentPosition(onLocationOk, onLocationNg, {
-    enableHighAccuracy: true,   // GPSを優先して精度を上げる（そのぶん少し時間がかかる）
-    timeout: 15000,             // 15秒たっても取れなければ諦める
-    maximumAge: 0               // 前回の測位結果を使い回さず、必ず取り直す
+    enableHighAccuracy: true,   // GPSを優先して精度を上げる
+    timeout: 15000,
+    maximumAge: 0
   });
 });
 
@@ -1165,73 +1092,37 @@ function resetHereButton(){
   btnHere.innerHTML = '<span class="dot"></span>現在地から追加';
 }
 
-// 測位に成功したとき
 function onLocationOk(pos){
   resetHereButton();
+  const lat = pos.coords.latitude, lng = pos.coords.longitude;
+  const acc = Math.round(pos.coords.accuracy);
 
-  const lat = pos.coords.latitude;
-  const lng = pos.coords.longitude;
-  const acc = Math.round(pos.coords.accuracy);   // 誤差の目安（メートル）
+  if (meMarker) meMarker.remove();
+  const el = document.createElement('div');
+  el.className = 'me';
+  meMarker = new maplibregl.Marker({ element: el }).setLngLat([lng, lat]).addTo(map);
 
-  showMe(lat, lng, acc);
-  map.setView([lat, lng], 18);                   // 現在地に大きく寄る
-
+  map.easeTo({ center: [lng, lat], zoom: 16, duration: 600 });
   addShopAt(lat, lng, `現在地に登録（誤差 約${acc}m）`);
 }
 
-// 測位に失敗したとき。err.code で理由がわかる。
 function onLocationNg(err){
   resetHereButton();
-  if (err.code === 1) {          // PERMISSION_DENIED
-    alert('位置情報の利用が許可されていません。\nアドレスバー左のアイコンから許可してください。');
-  } else if (err.code === 2) {   // POSITION_UNAVAILABLE
-    alert('位置情報を取得できませんでした。\n端末の位置情報がオンになっているか確認してください。');
-  } else {                       // TIMEOUT
-    alert('位置情報の取得に時間がかかりすぎました。\n屋外でもう一度お試しください。');
-  }
-}
-
-// 現在地に青い点と、誤差の範囲を示す円を描く
-function showMe(lat, lng, acc){
-  if (meMarker) {
-    map.removeLayer(meMarker);
-    map.removeLayer(meCircle);
-  }
-  meMarker = L.marker([lat, lng], {
-    icon: L.divIcon({ className: '', html: '<div class="me"></div>', iconSize: [16,16], iconAnchor: [8,8] }),
-    interactive: false          // クリックの邪魔をしない
-  }).addTo(map);
-
-  meCircle = L.circle([lat, lng], {
-    radius: acc,                // 誤差の半径をそのまま円の大きさにする
-    color: '#2e7d8f', weight: 1,
-    fillColor: '#2e7d8f', fillOpacity: .12,
-    interactive: false
-  }).addTo(map);
+  if (err.code === 1)      alert('位置情報の利用が許可されていません。\nアドレスバー左のアイコンから許可してください。');
+  else if (err.code === 2) alert('位置情報を取得できませんでした。\n端末の位置情報がオンになっているか確認してください。');
+  else                     alert('位置情報の取得に時間がかかりすぎました。\n屋外でもう一度お試しください。');
 }
 
 
 /* =========================================================
-   ⑤-3 操作：うどん屋の一覧から選ぶ
-   ---------------------------------------------------------
-   shops.json は厚生労働省の食品営業許可データから作った店舗一覧。
-   ここから選ぶと、位置を自分で指定しなくても登録できる。
+   ⑨ 一覧から選ぶ
    ========================================================= */
-
-let catalog = [];                       // 一覧のもとデータ
-
-fetch('shops.json')
-  .then(r => r.json())
-  .then(d => { catalog = d; })
-  .catch(() => console.warn('shops.json を読み込めませんでした。一覧は空になります。'));
 
 const sheet   = document.getElementById('sheet');
 const sheetQ  = document.getElementById('sheet-q');
 const sheetLs = document.getElementById('sheet-list');
 
-// スマホ（タッチ操作の端末）かどうかを判定する。
-// スマホで検索欄に自動でフォーカスすると、キーボードがせり上がって
-// 一覧が隠れてしまうため、PCのときだけ自動フォーカスする。
+// スマホで自動フォーカスするとキーボードが一覧を隠すので、PCのときだけ
 const isTouch = matchMedia('(pointer: coarse)').matches;
 
 document.getElementById('btn-list').addEventListener('click', () => {
@@ -1244,13 +1135,12 @@ document.getElementById('btn-list').addEventListener('click', () => {
 document.getElementById('sheet-close').addEventListener('click', () => sheet.classList.remove('open'));
 sheetQ.addEventListener('input', renderSheet);
 
-// 一覧の店が、すでに登録済みかどうかを調べる
 function findRegistered(item){
   return shops.find(s => s.name === item.name && Math.abs(s.lat - item.lat) < 1e-5);
 }
 
 function renderSheet(){
-  const kw   = sheetQ.value.trim();
+  const kw = sheetQ.value.trim();
   const area = areaSelect.value;
 
   let list = catalog.filter(s => area === 'all' || s.city === area);
@@ -1265,10 +1155,9 @@ function renderSheet(){
     return;
   }
 
-  sheetLs.innerHTML = list.map((s) => {
+  sheetLs.innerHTML = list.map(s => {
     const reg = findRegistered(s);
-    const n   = reg ? reg.visits.length : 0;
-    // catalog内の位置を data-i に入れて、クリック時に引けるようにする
+    const n = reg ? reg.visits.length : 0;
     return `<div class="row ${n ? '' : 'new'}" data-i="${catalog.indexOf(s)}">
         <div class="row-body">
           <div class="row-name">${escapeHtml(s.name)}</div>
@@ -1279,32 +1168,27 @@ function renderSheet(){
   }).join('');
 }
 
-// 行がクリックされたとき（1件ずつではなく、親でまとめて受ける）
 sheetLs.addEventListener('click', (e) => {
   const row = e.target.closest('.row');
   if (!row) return;
   pickFromCatalog(catalog[Number(row.dataset.i)]);
 });
 
-let serial = 0;   // 同じミリ秒に複数登録してもIDが衝突しないようにする
-
 function pickFromCatalog(item){
   let shop = findRegistered(item);
   let undo;
 
   if (shop) {
-    shop.visits.push(today());            // 登録済みなら訪問を1回増やす
+    shop.visits.push(today());
     const s = shop;
     undo = () => { s.visits.pop(); save(); redraw(); renderSheet(); };
   } else {
     shop = {
       id: 's' + Date.now() + '_' + (serial++),
-      name: item.name,
-      lat: item.lat,
-      lng: item.lng,
+      name: item.name, lat: item.lat, lng: item.lng,
       city: item.city || cityAt(item.lat, item.lng),
       addr: item.addr,
-      approx: item.approx || 0,      // 住所から割り出した概算位置かどうか
+      approx: item.approx || 0,
       visits: [today()]
     };
     shops.push(shop);
@@ -1315,37 +1199,29 @@ function pickFromCatalog(item){
   save();
   redraw();
   renderSheet();
-  map.setView([item.lat, item.lng], 16);
-  if (markers[shop.id]) markers[shop.id].openPopup();
+  map.easeTo({ center: [item.lng, item.lat], zoom: 15, duration: 600 });
+  if (markers[shop.id]) markers[shop.id].togglePopup();
   showUndo(item.name, undo);
 }
 
 
 /* =========================================================
-   ⑤-4 登録直後の「取り消す」トースト
-   ---------------------------------------------------------
-   ピンを開いて削除ボタンを押さなくても、登録した直後だけは
-   ワンタップで取り消せるようにする。地図クリック・右クリック・
-   現在地・一覧選択、どの登録経路からでもこの1つの関数を呼ぶ。
+   ⑩ 登録直後の「取り消す」トースト
    ========================================================= */
 
-const toast     = document.getElementById('toast');
+const toast = document.getElementById('toast');
 const toastName = document.getElementById('toast-name');
-const toastUndo = document.getElementById('toast-undo');
-
-let toastTimer = null;
-let lastAction = null;    // 直前の操作を取り消すための情報
+let toastTimer = null, lastAction = null;
 
 function showUndo(name, undoFn){
   lastAction = undoFn;
   toastName.textContent = name;
   toast.classList.add('show');
-
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => toast.classList.remove('show'), 6000);   // 6秒で自動的に消える
+  toastTimer = setTimeout(() => toast.classList.remove('show'), 6000);
 }
 
-toastUndo.addEventListener('click', () => {
+document.getElementById('toast-undo').addEventListener('click', () => {
   if (lastAction) lastAction();
   toast.classList.remove('show');
   clearTimeout(toastTimer);
@@ -1353,10 +1229,7 @@ toastUndo.addEventListener('click', () => {
 
 
 /* =========================================================
-   ⑥ 操作：訪問を記録する／削除する
-   ---------------------------------------------------------
-   ポップアップの中のボタンから呼ばれるので、
-   window に登録してどこからでも呼べるようにしておく。
+   ⑪ ピンのポップアップから呼ばれる操作
    ========================================================= */
 
 window.addVisit = function(id){
@@ -1365,12 +1238,10 @@ window.addVisit = function(id){
   shop.visits.push(today());
   save();
   redraw();
-  markers[id].openPopup();                         // 更新後のポップアップを開き直す
+  if (markers[id]) markers[id].togglePopup();
   showUndo(shop.name, () => {
-    shop.visits.pop();
-    save();
-    redraw();
-    if (markers[id]) markers[id].openPopup();
+    shop.visits.pop(); save(); redraw();
+    if (markers[id]) markers[id].togglePopup();
   });
 };
 
@@ -1394,10 +1265,7 @@ window.removeShop = function(id){
 
 
 /* =========================================================
-   ⑦ 書き出しと読み込み（バックアップ）
-   ---------------------------------------------------------
-   localStorage はブラウザを変えると引き継げないので、
-   JSONファイルとして手元に保存できるようにしておく。
+   ⑫ 書き出し・読み込み・メニュー
    ========================================================= */
 
 document.getElementById('btn-export').addEventListener('click', () => {
@@ -1411,7 +1279,6 @@ document.getElementById('btn-export').addEventListener('click', () => {
 });
 
 const fileInput = document.getElementById('file-input');
-
 document.getElementById('btn-import').addEventListener('click', () => fileInput.click());
 
 fileInput.addEventListener('change', (e) => {
@@ -1431,22 +1298,43 @@ fileInput.addEventListener('change', (e) => {
     }
   };
   reader.readAsText(file);
-  fileInput.value = '';                            // 同じファイルをもう一度選べるようにする
+  fileInput.value = '';
 });
+
+// 地図のスタイルを順番に切り替える
+document.getElementById('btn-style').addEventListener('click', () => {
+  const i = (STYLE_NAMES.indexOf(styleName) + 1) % STYLE_NAMES.length;
+  styleName = STYLE_NAMES[i];
+  localStorage.setItem(STYLE_KEY, styleName);
+  styleReady = false;
+  map.setStyle(STYLES[styleName]);
+  map.once('styledata', () => setTimeout(() => { installLayers(); redraw(); }, 100));
+});
+
+// 向きを初期状態（画面に合わせた角度）に戻す
+document.getElementById('btn-north').addEventListener('click', () => {
+  map.easeTo({ bearing: autoBearing(), duration: 500 });
+});
+
+const menu = document.getElementById('menu');
+document.getElementById('btn-menu').addEventListener('click', (e) => {
+  e.stopPropagation();
+  menu.classList.toggle('open');
+});
+document.addEventListener('click', () => menu.classList.remove('open'));
+menu.addEventListener('click', (e) => e.stopPropagation());
 
 
 /* =========================================================
-   ⑧ 小さな道具
+   ⑬ 小さな道具
    ========================================================= */
 
-// 今日の日付を 2026-09-03 の形で返す
 function today(){
   const d = new Date();
   const p = (n) => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
 }
 
-// 店名に < や > が入っていても表示が壊れないようにする
 function escapeHtml(str){
   const div = document.createElement('div');
   div.textContent = str;
@@ -1455,22 +1343,11 @@ function escapeHtml(str){
 
 
 /* =========================================================
-   ⑧-2 メニューの開閉
-   ========================================================= */
-const menu = document.getElementById('menu');
-document.getElementById('btn-menu').addEventListener('click', (e) => {
-  e.stopPropagation();                    // 直後の document のクリックで閉じないように
-  menu.classList.toggle('open');
-});
-document.addEventListener('click', () => menu.classList.remove('open'));
-menu.addEventListener('click', (e) => e.stopPropagation());
-
-
-/* =========================================================
-   ⑨ 起動
+   ⑭ 起動
    ========================================================= */
 load();
-redraw();
+refreshAreaOptions();
+updateStats();
 </script>
 
 </body>
