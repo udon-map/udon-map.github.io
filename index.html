@@ -354,6 +354,32 @@ button.active{ background:var(--amber); border-color:var(--amber); color:#1a1206
 .toast button{ font-size:12.5px; padding:7px 14px; background:rgba(255,255,255,.09); box-shadow:none; }
 .toast button:hover{ background:rgba(255,255,255,.16); }
 
+/* ---------- 選択中のエリア名（余白に縦書きで大きく出す） ---------- */
+.area-title{
+  position:absolute; z-index:1150;
+  right:16px; top:50%;
+  writing-mode:vertical-rl; text-orientation:upright;
+  display:none; align-items:flex-start; gap:10px;
+  pointer-events:none;                 /* 地図の操作を邪魔しない */
+  opacity:0; transform:translateY(-50%) translateX(14px);
+  transition:opacity .45s ease, transform .45s ease;
+}
+.area-title.show{ display:flex; opacity:1; transform:translateY(-50%) translateX(0); }
+
+.at-ja{
+  font-family:"Hiragino Mincho ProN","Yu Mincho","Noto Serif JP",serif;
+  font-size:46px; font-weight:600; letter-spacing:.16em;
+  color:rgba(240,180,80,.95);
+  text-shadow:0 2px 22px rgba(8,12,18,.7), 0 0 3px rgba(8,12,18,.6);
+}
+.at-en{
+  writing-mode:vertical-rl; text-orientation:sideways;
+  font-size:10.5px; font-weight:700; letter-spacing:.44em;
+  color:rgba(255,255,255,.5);
+  margin-top:4px;
+  text-shadow:0 1px 10px rgba(8,12,18,.8);
+}
+
 .foot-link{
   position:absolute; z-index:1200;
   left:14px; bottom:2px;
@@ -407,6 +433,9 @@ button.active{ background:var(--amber); border-color:var(--amber); color:#1a1206
   .toast.show{ transform:translateY(-4px); }
   .toast-text{ white-space:normal; flex:1; }
   .area-name{ font-size:10px; letter-spacing:.04em; }
+  .area-title{ right:10px; gap:7px; }
+  .at-ja{ font-size:31px; letter-spacing:.12em; }
+  .at-en{ font-size:9px; letter-spacing:.34em; }
 }
 </style>
 </head>
@@ -470,6 +499,11 @@ button.active{ background:var(--amber); border-color:var(--amber); color:#1a1206
   <button id="toast-undo">取り消す</button>
 </div>
 
+<div class="area-title" id="area-title" aria-hidden="true">
+  <span class="at-ja" id="at-ja"></span>
+  <span class="at-en" id="at-en"></span>
+</div>
+
 <a class="foot-link" href="privacy.html">プライバシーポリシー</a>
 
 <div class="fallback panel" id="fallback">
@@ -511,23 +545,23 @@ let styleReady = false;
    ========================================================= */
 
 const KAGAWA = [
-  { name: '高松市',     lat: 34.3428, lng: 134.0466 },
-  { name: '丸亀市',     lat: 34.2896, lng: 133.7979 },
-  { name: '坂出市',     lat: 34.3163, lng: 133.8603 },
-  { name: '善通寺市',   lat: 34.2262, lng: 133.7942 },
-  { name: '観音寺市',   lat: 34.1275, lng: 133.6614 },
-  { name: 'さぬき市',   lat: 34.3234, lng: 134.1730 },
-  { name: '東かがわ市', lat: 34.2296, lng: 134.3376 },
-  { name: '三豊市',     lat: 34.1873, lng: 133.7150 },
-  { name: '土庄町',     lat: 34.4869, lng: 134.1893 },
-  { name: '小豆島町',   lat: 34.4816, lng: 134.2847 },
-  { name: '三木町',     lat: 34.2687, lng: 134.1140 },
-  { name: '直島町',     lat: 34.4600, lng: 133.9950 },
-  { name: '宇多津町',   lat: 34.3055, lng: 133.8236 },
-  { name: '綾川町',     lat: 34.2308, lng: 133.9464 },
-  { name: '琴平町',     lat: 34.1867, lng: 133.8158 },
-  { name: '多度津町',   lat: 34.2740, lng: 133.7565 },
-  { name: 'まんのう町', lat: 34.1608, lng: 133.8845 }
+  { name: '高松市',     lat: 34.3428, lng: 134.0466, en: 'TAKAMATSU' },
+  { name: '丸亀市',     lat: 34.2896, lng: 133.7979, en: 'MARUGAME' },
+  { name: '坂出市',     lat: 34.3163, lng: 133.8603, en: 'SAKAIDE' },
+  { name: '善通寺市',   lat: 34.2262, lng: 133.7942, en: 'ZENTSUJI' },
+  { name: '観音寺市',   lat: 34.1275, lng: 133.6614, en: 'KANONJI' },
+  { name: 'さぬき市',   lat: 34.3234, lng: 134.1730, en: 'SANUKI' },
+  { name: '東かがわ市', lat: 34.2296, lng: 134.3376, en: 'HIGASHIKAGAWA' },
+  { name: '三豊市',     lat: 34.1873, lng: 133.7150, en: 'MITOYO' },
+  { name: '土庄町',     lat: 34.4869, lng: 134.1893, en: 'TONOSHO' },
+  { name: '小豆島町',   lat: 34.4816, lng: 134.2847, en: 'SHODOSHIMA' },
+  { name: '三木町',     lat: 34.2687, lng: 134.1140, en: 'MIKI' },
+  { name: '直島町',     lat: 34.4600, lng: 133.9950, en: 'NAOSHIMA' },
+  { name: '宇多津町',   lat: 34.3055, lng: 133.8236, en: 'UTAZU' },
+  { name: '綾川町',     lat: 34.2308, lng: 133.9464, en: 'AYAGAWA' },
+  { name: '琴平町',     lat: 34.1867, lng: 133.8158, en: 'KOTOHIRA' },
+  { name: '多度津町',   lat: 34.2740, lng: 133.7565, en: 'TADOTSU' },
+  { name: 'まんのう町', lat: 34.1608, lng: 133.8845, en: 'MANNO' }
 ];
 
 // 市町を塗り分ける色。差し色の琥珀と馴染む暖色でまとめている。
@@ -1044,6 +1078,17 @@ function applyArea(){
 
   labelMarkers.forEach(m => m.remove());
   labelMarkers = [];
+
+  // 余白に出す大きなエリア名
+  const at = document.getElementById('area-title');
+  if (area === 'all') {
+    at.classList.remove('show');
+  } else {
+    const info = KAGAWA.find(c => c.name === area);
+    document.getElementById('at-ja').textContent = area;
+    document.getElementById('at-en').textContent = info ? info.en : '';
+    at.classList.add('show');
+  }
 
   if (area === 'all') {
     map.setLayoutProperty('udon-city-fill', 'visibility', 'visible');
