@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, interactive-widget=resizes-content">
 
 <title>うどんマップ｜香川のうどん屋巡りを地図に記録する無料ツール</title>
 <meta name="description" content="訪れた香川県のうどん屋を地図にピンで記録できる無料ツール。高松市・丸亀市など市町ごとの訪問状況もひと目で確認できます。登録不要・インストール不要、記録は端末内にだけ保存されます。">
@@ -319,6 +319,29 @@ button.active{ background:var(--amber); border-color:var(--amber); color:#1a1206
   .sheet{ left:10px; right:10px; width:auto; top:auto; bottom:74px; height:58vh; }
 }
 
+.toast{
+  position:absolute; z-index:1400;
+  left:50%; bottom:22px; transform:translateX(-50%) translateY(0);
+  display:flex; align-items:center; gap:14px;
+  padding:11px 12px 11px 18px;
+  opacity:0; pointer-events:none;
+  transition:opacity .18s, transform .18s;
+}
+.toast.show{ opacity:1; pointer-events:auto; transform:translateX(-50%) translateY(-4px); }
+.toast-text{ font-size:13px; white-space:nowrap; }
+.toast-text b{ color:var(--amber); font-weight:600; }
+.toast button{
+  font-size:12.5px; padding:7px 14px;
+  background:rgba(255,255,255,.09); box-shadow:none;
+}
+.toast button:hover{ background:rgba(255,255,255,.16); }
+
+@media (max-width:640px){
+  .toast{ left:12px; right:12px; transform:translateY(0); width:auto; }
+  .toast.show{ transform:translateY(-4px); }
+  .toast-text{ white-space:normal; flex:1; }
+}
+
 .foot-link{
   position:absolute; z-index:1200;
   left:14px; top:auto; bottom:2px;
@@ -420,6 +443,11 @@ button.active{ background:var(--amber); border-color:var(--amber); color:#1a1206
 </div>
 
 <input type="file" id="file-input" accept="application/json" hidden>
+
+<div class="toast panel" id="toast">
+  <div class="toast-text"><b id="toast-name"></b> を登録しました</div>
+  <button id="toast-undo">取り消す</button>
+</div>
 
 <a class="foot-link" href="privacy.html">プライバシーポリシー</a>
 
@@ -866,6 +894,12 @@ function addShopAt(lat, lng, title){
     redraw();
     // 絞り込み中で画面に出ていない場合もあるので、あるときだけ開く
     if (markers[id]) markers[id].openPopup();
+
+    showUndo(name, () => {
+      shops = shops.filter(s => s.id !== id);
+      save();
+      redraw();
+    });
   }
 
   document.getElementById('new-save').addEventListener('click', commit);
@@ -992,9 +1026,17 @@ const sheet   = document.getElementById('sheet');
 const sheetQ  = document.getElementById('sheet-q');
 const sheetLs = document.getElementById('sheet-list');
 
+// スマホ（タッチ操作の端末）かどうかを判定する。
+// スマホで検索欄に自動でフォーカスすると、キーボードがせり上がって
+// 一覧が隠れてしまうため、PCのときだけ自動フォーカスする。
+const isTouch = matchMedia('(pointer: coarse)').matches;
+
 document.getElementById('btn-list').addEventListener('click', () => {
   sheet.classList.toggle('open');
-  if (sheet.classList.contains('open')) { renderSheet(); sheetQ.focus(); }
+  if (sheet.classList.contains('open')) {
+    renderSheet();
+    if (!isTouch) sheetQ.focus();
+  }
 });
 document.getElementById('sheet-close').addEventListener('click', () => sheet.classList.remove('open'));
 sheetQ.addEventListener('input', renderSheet);
@@ -1045,9 +1087,12 @@ let serial = 0;   // 同じミリ秒に複数登録してもIDが衝突しない
 
 function pickFromCatalog(item){
   let shop = findRegistered(item);
+  let undo;
 
   if (shop) {
     shop.visits.push(today());            // 登録済みなら訪問を1回増やす
+    const s = shop;
+    undo = () => { s.visits.pop(); save(); redraw(); renderSheet(); };
   } else {
     shop = {
       id: 's' + Date.now() + '_' + (serial++),
@@ -1060,6 +1105,8 @@ function pickFromCatalog(item){
       visits: [today()]
     };
     shops.push(shop);
+    const id = shop.id;
+    undo = () => { shops = shops.filter(s => s.id !== id); save(); redraw(); renderSheet(); };
   }
 
   save();
@@ -1067,7 +1114,39 @@ function pickFromCatalog(item){
   renderSheet();
   map.setView([item.lat, item.lng], 16);
   if (markers[shop.id]) markers[shop.id].openPopup();
+  showUndo(item.name, undo);
 }
+
+
+/* =========================================================
+   ⑤-4 登録直後の「取り消す」トースト
+   ---------------------------------------------------------
+   ピンを開いて削除ボタンを押さなくても、登録した直後だけは
+   ワンタップで取り消せるようにする。地図クリック・右クリック・
+   現在地・一覧選択、どの登録経路からでもこの1つの関数を呼ぶ。
+   ========================================================= */
+
+const toast     = document.getElementById('toast');
+const toastName = document.getElementById('toast-name');
+const toastUndo = document.getElementById('toast-undo');
+
+let toastTimer = null;
+let lastAction = null;    // 直前の操作を取り消すための情報
+
+function showUndo(name, undoFn){
+  lastAction = undoFn;
+  toastName.textContent = name;
+  toast.classList.add('show');
+
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toast.classList.remove('show'), 6000);   // 6秒で自動的に消える
+}
+
+toastUndo.addEventListener('click', () => {
+  if (lastAction) lastAction();
+  toast.classList.remove('show');
+  clearTimeout(toastTimer);
+});
 
 
 /* =========================================================
@@ -1084,6 +1163,12 @@ window.addVisit = function(id){
   save();
   redraw();
   markers[id].openPopup();                         // 更新後のポップアップを開き直す
+  showUndo(shop.name, () => {
+    shop.visits.pop();
+    save();
+    redraw();
+    if (markers[id]) markers[id].openPopup();
+  });
 };
 
 window.setCity = function(id, city){
