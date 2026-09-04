@@ -1373,6 +1373,29 @@ document.getElementById('btn-list').addEventListener('click', () => {
   }
 });
 document.getElementById('sheet-close').addEventListener('click', () => sheet.classList.remove('open'));
+
+/* パネルの外側をクリック（タップ）したら閉じる。
+   ・パネル自身の中は閉じない（項目や検索欄の操作を続けられるように）
+   ・「一覧から選ぶ」ボタンも除外する（開いた直後に閉じてしまうため）
+   ・地図の上をタップしたときは閉じたい ＝ document 全体で受ける */
+document.addEventListener('click', (e) => {
+  if (!sheet.classList.contains('open')) return;
+  if (sheet.contains(e.target)) return;                       // パネルの中
+  if (e.target.closest('#btn-list')) return;                  // 開閉ボタン自身
+  if (e.target.closest('#area')) return;                      // 上部のエリア選択（一覧と連動するため）
+  sheet.classList.remove('open');
+});
+
+// 地図の操作（ドラッグ・ズーム）でも閉じるようにしておく。
+// 地図を動かしたい＝一覧はもう用済み、という場面がほとんどのため。
+map.on('dragstart', () => sheet.classList.remove('open'));
+
+// Escキーでも閉じる
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && sheet.classList.contains('open')) {
+    sheet.classList.remove('open');
+  }
+});
 sheetQ.addEventListener('input', () => {
   // エリアを選ぶ画面で文字を打ったら、全域から探す一覧に切り替える
   if (sheetView === 'areas' && sheetQ.value.trim()) {
