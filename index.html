@@ -566,8 +566,9 @@ function ofm(styleName){
       style.layers.forEach(l => {
         // OpenFreeMapのスタイルは OpenMapTiles の構成に沿っており、
         // 地名・国名・道路名などの文字レイヤーは type が "symbol" で、
-        // レイヤーIDが "place" や "poi" から始まる。それらだけを非表示にする。
-        if (l.type === 'symbol' && /^(place|poi)/.test(l.id)) {
+        // レイヤーIDが "place_" や "poi_" で始まる（ハイフンではなくアンダースコア）。
+        // それらだけを非表示にする。
+        if (l.type === 'symbol' && /^(place|poi)[_-]/.test(l.id)) {
           mgl.setLayoutProperty(l.id, 'visibility', 'none');
         }
       });
@@ -606,6 +607,14 @@ if (Object.keys(baseLayers).length > 1) {
   L.control.layers(baseLayers, null, { position: 'bottomright' }).addTo(map);
 }
 map.on('baselayerchange', (e) => localStorage.setItem(TILE_KEY, e.name));
+
+// 地図の移動・ズームを香川県の周辺だけに制限する。
+// これにより、スクロールやピンチで県外まで見えてしまうのを防ぐ。
+// KAGAWAの役所座標から大まかな範囲を作り、少し余白を持たせている。
+const KAGAWA_BOUNDS = L.latLngBounds(KAGAWA.map(c => [c.lat, c.lng])).pad(0.35);
+map.setMaxBounds(KAGAWA_BOUNDS);
+map.setMinZoom(9);
+map.on('drag', () => map.panInsideBounds(KAGAWA_BOUNDS, { animate: false }));
 
 
 /* =========================================================
@@ -735,8 +744,16 @@ function applyArea(){
   );
   maskLayer = L.polygon(
     [[[85, -180], [85, 180], [-85, 180], [-85, -180]], ...holes],
-    { stroke: false, fillColor: '#0e1319', fillOpacity: .42, interactive: false }
+    { stroke: false, fillColor: '#0e1319', fillOpacity: .42 }
   ).addTo(map);
+
+  // 選択中の市町の外側（暗くなっている部分）をクリックすると、選択を解除して
+  // 「香川県全体」に戻す。地図から店を登録するモード中は誤操作になるので働かせない。
+  maskLayer.on('click', () => {
+    if (addingMode) return;
+    areaSelect.value = 'all';
+    areaSelect.dispatchEvent(new Event('change'));
+  });
 
   // ② 選んだ市町を琥珀色で縁取る
   highlightLayer = L.geoJSON(f, {
