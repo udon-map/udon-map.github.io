@@ -565,7 +565,8 @@ map.touchZoomRotate.enableRotation();
    「文字を描くレイヤー（type が symbol）」を全部消す。
    ========================================================= */
 function hideBaseLabels(){
-  const style = map.getStyle();
+  let style;
+  try { style = map.getStyle(); } catch (e) { return; }   // 準備前なら何もしない
   if (!style || !style.layers) return;
   for (const l of style.layers) {
     if (l.type !== 'symbol') continue;
@@ -664,9 +665,10 @@ function featureCenter(f){
    東西の軸が縦になるよう回して、画面を目いっぱい使う。
    ========================================================= */
 function autoBearing(){
-  const el = map.getContainer();
-  const portrait = el.clientHeight > el.clientWidth;
-  return portrait ? 90 : 0;      // 縦長の画面のときだけ、東を上に向ける
+  // 初期状態は北を上（0度）に固定する。
+  // 指2本でひねれば自由に回せるし、「向きを初期状態に戻す」でここに戻る。
+  // 縦長画面で余白を詰めたくなったら、ここを 90 にすると東が上を向く。
+  return 0;
 }
 
 
@@ -774,8 +776,22 @@ function updateStats(){
    スタイルを切り替えると全部消えるので、まとめてやり直せるようにしてある。
    ========================================================= */
 
+/* 地図の準備が整うタイミングは環境によってばらつくので、
+   「まだなら何もせず、次の機会に再挑戦する」形にしておく。
+   load / styledata / idle の3つから繰り返し呼ぶので、
+   どこかのタイミングで必ず設置される。 */
+function ensureLayers(){
+  if (!boundaries.length) return;          // データがまだ
+  if (map.getLayer('udon-outside')) return; // すでに設置済み
+  try {
+    installLayers();
+  } catch (e) {
+    // 地図側の準備がまだ。次の呼び出しに任せる
+  }
+}
+
 function installLayers(){
-  if (!boundaries.length || !map.isStyleLoaded()) return;
+  if (!boundaries.length) return;
 
   hideBaseLabels();
 
@@ -944,16 +960,15 @@ map.on('load', () => {
     // 県外そのものはマスク（udon-outside）で隠しているため、これで十分。
     map.setMaxBounds([[b[0][0] - 0.5, b[0][1] - 0.4], [b[1][0] + 0.5, b[1][1] + 0.4]]);
 
-    installLayers();
+    ensureLayers();
     redraw();
   });
 });
 
-// スタイルを切り替えたときは、自分の追加分をまとめて入れ直す
-map.on('styledata', () => {
-  if (!boundaries.length) return;
-  if (map.isStyleLoaded() && !map.getLayer('udon-outside')) installLayers();
-});
+// 地図の準備が整うたびに設置を試みる。
+// styledata はスタイル切り替え時にも飛ぶので、切り替え後の入れ直しも兼ねる。
+map.on('styledata', () => { hideBaseLabels(); ensureLayers(); });
+map.on('idle',      () => { hideBaseLabels(); ensureLayers(); });
 
 // 画面を回したときなど、縦横比が変わったら向きを取り直す
 let resizeTimer = null;
@@ -1308,7 +1323,8 @@ document.getElementById('btn-style').addEventListener('click', () => {
   localStorage.setItem(STYLE_KEY, styleName);
   styleReady = false;
   map.setStyle(STYLES[styleName]);
-  map.once('styledata', () => setTimeout(() => { installLayers(); redraw(); }, 100));
+  // 入れ直しは styledata / idle から呼ばれる ensureLayers に任せる
+  map.once('idle', redraw);
 });
 
 // 向きを初期状態（画面に合わせた角度）に戻す
