@@ -568,6 +568,8 @@ button.active{ background:var(--amber); border-color:var(--amber); color:#1a1206
   <div class="menu-wrap">
     <button id="btn-menu" aria-label="メニュー">···</button>
     <div class="menu panel" id="menu">
+      <button id="btn-share">Xに投稿する</button>
+      <hr>
       <button id="btn-style">地図のスタイルを変える</button>
       <button id="btn-north">向きを初期状態に戻す</button>
       <hr>
@@ -1206,9 +1208,15 @@ function installLayers(){
 }
 
 // 市町の上にマウスを乗せたときの反応
+/* このズームより寄っている状態では、市町のタップで選択しない。
+   拡大して店を登録しようとしているときに、選択が割り込まないようにする。
+   県全体が見えている状態はおおよそ 9〜10 なので、11 を境目にしている。 */
+const SELECT_MAX_ZOOM = 11;
+
 let hovered = null;
 map.on('mousemove', 'udon-city-fill', (e) => {
   if (areaSelect.value !== 'all') return;
+  if (map.getZoom() > SELECT_MAX_ZOOM) { map.getCanvas().style.cursor = ''; return; }
   map.getCanvas().style.cursor = 'pointer';
   if (hovered) map.setFeatureState({ source: 'udon-kagawa', id: hovered }, { hover: false });
   hovered = e.features[0].id;
@@ -1220,9 +1228,22 @@ map.on('mouseleave', 'udon-city-fill', () => {
   hovered = null;
 });
 
+/* 地図を動かした直後のクリックを無視するための仕掛け。
+   スマホでピンチ拡大すると、指を離したときにタップとして拾われ、
+   市町が勝手に選択されて拡大位置から引き戻されてしまうため。 */
+let mapMoved = false;
+let ignoreClickUntil = 0;
+
+map.on('movestart', () => { mapMoved = true; });
+map.on('moveend', () => {
+  if (mapMoved) { ignoreClickUntil = Date.now() + 400; mapMoved = false; }
+});
+
 // 市町をクリック＝エリア選択で選んだのと同じ扱い
 map.on('click', 'udon-city-fill', (e) => {
   if (addingMode || areaSelect.value !== 'all') return;
+  if (Date.now() < ignoreClickUntil) return;        // 拡大・移動の直後は反応しない
+  if (map.getZoom() > SELECT_MAX_ZOOM) return;      // 寄っているときは選択しない
   areaSelect.value = e.features[0].properties.name;
   areaSelect.dispatchEvent(new Event('change'));
 });
@@ -1230,6 +1251,7 @@ map.on('click', 'udon-city-fill', (e) => {
 // 選択中に、暗くなっている外側をクリックすると選択解除
 map.on('click', 'udon-dim', (e) => {
   if (addingMode || areaSelect.value === 'all') return;
+  if (Date.now() < ignoreClickUntil) return;        // 拡大・移動の直後は反応しない
   areaSelect.value = 'all';
   areaSelect.dispatchEvent(new Event('change'));
 });
@@ -1891,6 +1913,56 @@ document.getElementById('btn-menu').addEventListener('click', (e) => {
 });
 document.addEventListener('click', () => menu.classList.remove('open'));
 menu.addEventListener('click', (e) => e.stopPropagation());
+
+
+/* =========================================================
+   ⑫-2 Xへの投稿
+   ---------------------------------------------------------
+   訪問済みの軒数・のべ杯数・制覇率を文章にして、Xの投稿画面を開く。
+   投稿そのものはユーザーがXの画面で確認してから行う。
+   ========================================================= */
+
+function buildShareText(){
+  const visited = shops.filter(s => s.visits.length > 0);
+  const total   = visited.reduce((n, s) => n + s.visits.length, 0);
+
+  // 一覧に載っている店の総数（制覇率の分母）
+  const denom = catalog.length;
+  const rate  = denom ? Math.round(visited.length / denom * 1000) / 10 : 0;
+
+  // 訪問した市町のうち、軒数が多い順に3つ
+  const byCity = {};
+  visited.forEach(s => { byCity[s.city] = (byCity[s.city] || 0) + 1; });
+  const top = Object.entries(byCity).sort((a, b) => b[1] - a[1]).slice(0, 3)
+                    .map(([c, n]) => `${c} ${n}軒`).join('　');
+
+  // 到達した市町の数（17市町のうちいくつに足を運んだか）
+  const cityCount = Object.keys(byCity).length;
+
+  const lines = [
+    `🍜 香川うどん巡り ${visited.length}軒 制覇`,
+    ``,
+    `のべ ${total}杯　${cityCount}/17 市町`,
+    denom ? `県内制覇率 ${rate}%` : ''
+  ];
+  if (top) lines.push(``, top);
+  lines.push(``, '#うどんマップ #讃岐うどん #香川');
+
+  return lines.filter(l => l !== undefined).join('\n');
+}
+
+document.getElementById('btn-share').addEventListener('click', () => {
+  const visited = shops.filter(s => s.visits.length > 0);
+  if (!visited.length) {
+    alert('まだ記録がありません。\n1軒でも登録してから投稿してください。');
+    return;
+  }
+  const url = 'https://udon-map.github.io/';
+  const intent = 'https://twitter.com/intent/tweet'
+    + '?text=' + encodeURIComponent(buildShareText())
+    + '&url='  + encodeURIComponent(url);
+  window.open(intent, '_blank', 'noopener');
+});
 
 
 /* =========================================================
