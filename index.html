@@ -1520,9 +1520,15 @@ document.getElementById('sheet-close').addEventListener('click', () => sheet.cla
    ・パネル自身の中は閉じない（項目や検索欄の操作を続けられるように）
    ・「一覧から選ぶ」ボタンも除外する（開いた直後に閉じてしまうため）
    ・地図の上をタップしたときは閉じたい ＝ document 全体で受ける */
+/* パネル内のクリックは、外側判定まで伝わらないようにする。
+   ＋/− を押すと一覧が描き直されてボタン自体がDOMから消えるため、
+   あとから sheet.contains() で判定すると「外側」と誤認してしまう。
+   ここで止めておけば、その取り違えが起きない。 */
+sheet.addEventListener('click', (e) => e.stopPropagation());
+
 document.addEventListener('click', (e) => {
   if (!sheet.classList.contains('open')) return;
-  if (sheet.contains(e.target)) return;                       // パネルの中
+  if (sheet.contains(e.target)) return;                       // パネルの中（念のため）
   if (e.target.closest('#btn-list')) return;                  // 開閉ボタン自身
   if (e.target.closest('#area')) return;                      // 上部のエリア選択（一覧と連動するため）
   sheet.classList.remove('open');
@@ -1610,6 +1616,8 @@ function renderSheet(){
     return;
   }
 
+  const keepScroll = sheetLs.scrollTop;      // 描き直しで先頭に戻らないよう控える
+
   sheetLs.innerHTML = sheetEntries.map((e, i) => {
     const n = e.shop ? e.shop.visits.length : 0;
     return `<div class="row ${n ? '' : 'new'}" data-i="${i}">
@@ -1625,6 +1633,8 @@ function renderSheet(){
         </div>
       </div>`;
   }).join('');
+
+  sheetLs.scrollTop = keepScroll;           // 元の位置に戻す
 }
 
 /* 一覧の項目から訪問を1回増やす */
@@ -1634,8 +1644,12 @@ function entryPlus(e){
   const shop = e.shop;
   shop.visits.push(today());
   save(); redraw(); renderSheet();
-  map.easeTo({ center: [shop.lng, shop.lat], zoom: 15, duration: 600 });
-  if (markers[shop.id]) markers[shop.id].togglePopup();
+  // 一覧を開いたまま連続で登録している最中は、地図を動かさない。
+  // パネルの裏で勝手に移動されると、どこを見ているか分からなくなるため。
+  if (!sheet.classList.contains('open')) {
+    map.easeTo({ center: [shop.lng, shop.lat], zoom: 15, duration: 600 });
+    if (markers[shop.id]) markers[shop.id].togglePopup();
+  }
   showUndo(shop.name, () => { shop.visits.pop(); save(); redraw(); renderSheet(); },
            'の記録を1回増やしました');
 }
@@ -1748,8 +1762,10 @@ function pickFromCatalog(item){
   save();
   redraw();
   renderSheet();
-  map.easeTo({ center: [item.lng, item.lat], zoom: 15, duration: 600 });
-  if (markers[shop.id]) markers[shop.id].togglePopup();
+  if (!sheet.classList.contains('open')) {
+    map.easeTo({ center: [item.lng, item.lat], zoom: 15, duration: 600 });
+    if (markers[shop.id]) markers[shop.id].togglePopup();
+  }
   showUndo(item.name, undo);
 }
 
