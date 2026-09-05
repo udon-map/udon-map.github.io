@@ -1084,10 +1084,52 @@ function ensureLayers(){
   }
 }
 
+/* 県外に敷く「青海波＋島影」のタイル画像を、その場で描いて作る。
+   外部の画像ファイルを増やさずに済み、色や濃さもコードで調整できる。
+   128pxごとに繰り返しても継ぎ目が出ないよう、端をまたぐぶんも描いている。 */
+function makeSeaPattern(){
+  const T = 128, SX = 64, SY = 44;
+  const cv = document.createElement('canvas');
+  cv.width = cv.height = T;
+  const g = cv.getContext('2d');
+
+  // 青海波：半円の弧を千鳥に並べる
+  g.lineWidth = 1;
+  for (let row = -1; row <= T / SY + 1; row++) {
+    for (let col = -1; col <= T / SX + 1; col++) {
+      const cx = col * SX + (row % 2 ? SX / 2 : 0);
+      const cy = row * SY;
+      [[13, .16], [21, .13], [29, .10]].forEach(([r, a]) => {
+        g.strokeStyle = `rgba(126,158,190,${a})`;
+        g.beginPath();
+        g.ellipse(cx, cy, r, r * 0.62, 0, Math.PI * 1.08, Math.PI * 1.92);
+        g.stroke();
+      });
+    }
+  }
+
+  // 遠くの島影に見立てた点
+  const dots = [[18,26,1],[96,14,1],[57,63,1.4],[120,88,1],[34,104,1],[78,118,1.4],[8,74,1]];
+  g.fillStyle = 'rgba(170,198,222,.26)';
+  dots.forEach(([x, y, r]) => {
+    for (const dx of [-T, 0, T]) for (const dy of [-T, 0, T]) {
+      g.beginPath();
+      g.arc(x + dx, y + dy, r, 0, Math.PI * 2);
+      g.fill();
+    }
+  });
+
+  return { width: T, height: T, data: g.getImageData(0, 0, T, T).data };
+}
+
 function installLayers(){
   if (!boundaries.length) return;
 
   hideBaseLabels();
+
+  if (!map.hasImage('sea-pattern')) {
+    map.addImage('sea-pattern', makeSeaPattern());
+  }
 
   // --- データを登録 ---
   if (!map.getSource('udon-kagawa')) {
@@ -1114,6 +1156,12 @@ function installLayers(){
     map.addLayer({                        // ① 県外（瀬戸内海側）を深い藍鉄色で塗る
       id: 'udon-outside', type: 'fill', source: 'udon-mask',
       paint: { 'fill-color': '#151d27', 'fill-opacity': 1 }
+    });
+  }
+  if (!map.getLayer('udon-sea-pattern')) {
+    map.addLayer({                        // ①-b 海の上に青海波と島影を薄く敷く
+      id: 'udon-sea-pattern', type: 'fill', source: 'udon-mask',
+      paint: { 'fill-pattern': 'sea-pattern' }
     });
   }
   if (!map.getLayer('udon-coast-glow')) {
