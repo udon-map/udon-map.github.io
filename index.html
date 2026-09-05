@@ -62,7 +62,7 @@ body{
   font-family: -apple-system, "Hiragino Sans", "Noto Sans JP", "Yu Gothic UI", "Segoe UI", sans-serif;
   font-feature-settings: "palt" 1;
   color: var(--text);
-  background: #e7e7e4;
+  background: #151d27;
 }
 
 #map{ position:absolute; inset:0; z-index:0; }
@@ -123,6 +123,22 @@ body{
 @media (prefers-reduced-motion: reduce){
   .kagawa-line{ animation:none; stroke-dashoffset:0; }
   .splash-text{ animation:none; opacity:1; }
+}
+
+
+/* ---------- 画面の質感 ----------
+   周辺をわずかに落として中央に視線を集め、
+   さらに細かいノイズを薄く重ねて、のっぺりした塗りに紙のような手触りを出す。
+   どちらも地図の操作を邪魔しないよう pointer-events は無効。 */
+.vignette{
+  position:absolute; inset:0; z-index:99; pointer-events:none;
+  background:radial-gradient(ellipse 78% 66% at 50% 48%,
+             rgba(0,0,0,0) 52%, rgba(5,9,14,.5) 100%);
+}
+.grain{
+  position:absolute; inset:0; z-index:100; pointer-events:none;
+  opacity:.05; mix-blend-mode:overlay;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
 /* ---------- 浮かぶパネル共通 ---------- */
@@ -562,6 +578,8 @@ button.active{ background:var(--amber); border-color:var(--amber); color:#1a1206
 </div>
 
 <div id="map"></div>
+<div class="vignette" aria-hidden="true"></div>
+<div class="grain" aria-hidden="true"></div>
 
 <div class="sheet panel" id="sheet">
   <div class="sheet-head">
@@ -1093,9 +1111,24 @@ function installLayers(){
 
   // --- 描き方を登録（下から順に）---
   if (!map.getLayer('udon-outside')) {
-    map.addLayer({                        // ① 県外を完全に隠す
+    map.addLayer({                        // ① 県外（瀬戸内海側）を深い藍鉄色で塗る
       id: 'udon-outside', type: 'fill', source: 'udon-mask',
-      paint: { 'fill-color': '#e7e7e4', 'fill-opacity': 1 }
+      paint: { 'fill-color': '#151d27', 'fill-opacity': 1 }
+    });
+  }
+  if (!map.getLayer('udon-coast-glow')) {
+    map.addLayer({                        // ②-a 海岸線に沿ってぼんやりした光を回す
+      id: 'udon-coast-glow', type: 'line', source: 'udon-kagawa',
+      paint: {
+        'line-color': '#e8a33d',
+        'line-width': 13, 'line-blur': 11, 'line-opacity': 0.3
+      }
+    });
+  }
+  if (!map.getLayer('udon-coast')) {
+    map.addLayer({                        // ②-b 海岸線そのものを細く光らせる
+      id: 'udon-coast', type: 'line', source: 'udon-kagawa',
+      paint: { 'line-color': 'rgba(255,225,180,.55)', 'line-width': 0.9 }
     });
   }
   if (!map.getLayer('udon-city-fill')) {
