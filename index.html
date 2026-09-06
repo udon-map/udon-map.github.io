@@ -476,6 +476,26 @@ button.active{ background:var(--amber); border-color:var(--amber); color:#1a1206
   text-shadow:0 1px 10px rgba(8,12,18,.8);
 }
 
+/* ---------- 記録カード ---------- */
+.card-modal{
+  position:fixed; inset:0; z-index:2500;
+  display:none; align-items:center; justify-content:center;
+  background:rgba(6,10,15,.82);
+  -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px);
+  padding:18px;
+}
+.card-modal.show{ display:flex; }
+.card-box{ padding:14px; max-width:min(92vw, 520px); width:100%; }
+#card-canvas{
+  width:100%; height:auto; display:block;
+  border-radius:10px; background:var(--ink);
+}
+.card-actions{
+  display:flex; gap:8px; margin-top:12px; flex-wrap:wrap;
+  align-items:center; justify-content:center;
+}
+.card-actions button{ font-size:12.5px; padding:9px 15px; box-shadow:none; }
+
 .foot-link{
   position:absolute; z-index:1200;
   left:14px; bottom:2px;
@@ -568,6 +588,7 @@ button.active{ background:var(--amber); border-color:var(--amber); color:#1a1206
   <div class="menu-wrap">
     <button id="btn-menu" aria-label="メニュー">···</button>
     <div class="menu panel" id="menu">
+      <button id="btn-card">記録カードを作る</button>
       <button id="btn-share">Xに投稿する</button>
       <hr>
       <button id="btn-style">地図のスタイルを変える</button>
@@ -613,6 +634,18 @@ button.active{ background:var(--amber); border-color:var(--amber); color:#1a1206
 <div class="area-title" id="area-title" aria-hidden="true">
   <span class="at-ja" id="at-ja"></span>
   <span class="at-en" id="at-en"></span>
+</div>
+
+<div class="card-modal" id="card-modal">
+  <div class="card-box panel">
+    <canvas id="card-canvas" width="1080" height="1080"></canvas>
+    <div class="card-actions">
+      <button id="card-save" class="primary">画像を保存</button>
+      <button id="card-share">共有する</button>
+      <button id="card-x">Xに投稿</button>
+      <button id="card-close" class="link-danger">閉じる</button>
+    </div>
+  </div>
 </div>
 
 <a class="foot-link" href="privacy.html">プライバシーポリシー</a>
@@ -1962,6 +1995,163 @@ document.getElementById('btn-share').addEventListener('click', () => {
     + '?text=' + encodeURIComponent(buildShareText())
     + '&url='  + encodeURIComponent(url);
   window.open(intent, '_blank', 'noopener');
+});
+
+
+/* =========================================================
+   ⑫-3 記録カードの生成
+   ---------------------------------------------------------
+   香川県の形に、訪問した店を光る点として描いた画像を作る。
+   未訪問の店も薄い点で置くので、「あとどれだけ残っているか」が
+   一目でわかる。SNSに貼ることを想定した 1080×1080 の正方形。
+   ========================================================= */
+
+const cardModal  = document.getElementById('card-modal');
+const cardCanvas = document.getElementById('card-canvas');
+
+function drawCard(){
+  const S = 1080;
+  const g = cardCanvas.getContext('2d');
+  const visited = shops.filter(s => s.visits.length > 0);
+
+  const AMBER = '#e8a33d', INK = '#12161b', TEXT = '#f1efec', MUTED = '#96a0aa';
+  const FONT = '"Hiragino Sans","Noto Sans JP","Yu Gothic UI","Segoe UI",sans-serif';
+
+  g.fillStyle = INK; g.fillRect(0, 0, S, S);
+
+  // --- 香川県の形を画面に収める計算 ---
+  let minx=180, maxx=-180, miny=90, maxy=-90;
+  boundaries.forEach(f => f.geometry.coordinates.forEach(poly => poly[0].forEach(p => {
+    if (p[0]<minx) minx=p[0]; if (p[0]>maxx) maxx=p[0];
+    if (p[1]<miny) miny=p[1]; if (p[1]>maxy) maxy=p[1];
+  })));
+  const k = Math.cos((miny+maxy)/2 * Math.PI/180);
+  const BX=48, BY=165, BW=S-96, BH=520;
+  const sc = Math.min(BW/((maxx-minx)*k), BH/(maxy-miny));
+  const ox = BX + (BW-(maxx-minx)*k*sc)/2;
+  const oy = BY + (BH-(maxy-miny)*sc)/2;
+  const px = p => [ox + (p[0]-minx)*k*sc, oy + (maxy-p[1])*sc];
+
+  // --- 海岸線のぼんやりした光 ---
+  g.save();
+  g.shadowColor = AMBER; g.shadowBlur = 26;
+  g.strokeStyle = 'rgba(232,163,61,.85)'; g.lineWidth = 2; g.lineJoin = 'round';
+  boundaries.forEach(f => f.geometry.coordinates.forEach(poly => {
+    g.beginPath();
+    poly[0].forEach((p,i) => { const [x,y]=px(p); i ? g.lineTo(x,y) : g.moveTo(x,y); });
+    g.closePath(); g.stroke();
+  }));
+  g.restore();
+
+  // --- 陸地を塗る ---
+  g.fillStyle = '#262d36';
+  g.strokeStyle = 'rgba(232,163,61,.45)'; g.lineWidth = 1.2;
+  boundaries.forEach(f => f.geometry.coordinates.forEach(poly => {
+    g.beginPath();
+    poly[0].forEach((p,i) => { const [x,y]=px(p); i ? g.lineTo(x,y) : g.moveTo(x,y); });
+    g.closePath(); g.fill(); g.stroke();
+  }));
+
+  // --- 未訪問の店（薄い点） ---
+  g.fillStyle = 'rgba(150,160,172,.38)';
+  catalog.forEach(s => {
+    const [x,y] = px([s.lng, s.lat]);
+    g.beginPath(); g.arc(x, y, 1.9, 0, Math.PI*2); g.fill();
+  });
+
+  // --- 訪問した店（光る点。回数が多いほど大きい） ---
+  visited.forEach(s => {
+    const [x,y] = px([s.lng, s.lat]);
+    const r = 4.5 + Math.min(s.visits.length, 10) * 0.8;
+    g.fillStyle = 'rgba(232,163,61,.28)';
+    g.beginPath(); g.arc(x, y, r+6, 0, Math.PI*2); g.fill();
+    g.fillStyle = '#f0b450';
+    g.strokeStyle = 'rgba(255,255,255,.85)'; g.lineWidth = 1.6;
+    g.beginPath(); g.arc(x, y, r, 0, Math.PI*2); g.fill(); g.stroke();
+  });
+
+  // --- 文字を字間つきで中央に置く小道具 ---
+  function tracked(text, y, font, color, tr){
+    g.font = font; g.fillStyle = color; g.textAlign = 'left';
+    let w = -tr;
+    for (const c of text) w += g.measureText(c).width + tr;
+    let x = (S - w) / 2;
+    for (const c of text) { g.fillText(c, x, y); x += g.measureText(c).width + tr; }
+  }
+
+  tracked('UDON · MAP', 88, `700 32px ${FONT}`, AMBER, 11);
+  tracked('K A G A W A   U D O N   R E C O R D', 122, `500 14px ${FONT}`, MUTED, 3);
+
+  // --- 大きな軒数 ---
+  const n = String(visited.length);
+  g.textAlign = 'left';
+  g.font = `700 132px ${FONT}`;   const wn = g.measureText(n).width;
+  g.font = `700 40px ${FONT}`;    const wu = g.measureText(' 軒 制覇').width;
+  const sx = (S - (wn + wu + 10)) / 2;
+  g.font = `700 132px ${FONT}`; g.fillStyle = TEXT; g.fillText(n, sx, 830);
+  g.font = `700 40px ${FONT}`;  g.fillStyle = AMBER; g.fillText(' 軒 制覇', sx + wn + 10, 830);
+
+  g.strokeStyle = 'rgba(255,255,255,.16)'; g.lineWidth = 2;
+  g.beginPath(); g.moveTo(180, 882); g.lineTo(S-180, 882); g.stroke();
+
+  // --- 下段の数値 ---
+  const total  = visited.reduce((a,s) => a + s.visits.length, 0);
+  const cities = new Set(visited.map(s => s.city)).size;
+  const rate   = catalog.length ? Math.round(visited.length / catalog.length * 1000)/10 : 0;
+  const cols = [[String(total),'杯'], [`${cities}/17`,'市町'], [`${rate}%`,'制覇率']];
+  g.textAlign = 'center';
+  cols.forEach(([v,u], i) => {
+    const x = S * (0.25 + i*0.25);
+    g.font = `700 46px ${FONT}`; g.fillStyle = TEXT;  g.fillText(v, x, 950);
+    g.font = `500 18px ${FONT}`; g.fillStyle = MUTED; g.fillText(u, x, 984);
+  });
+
+  tracked('udon-map.github.io', 1032, `500 18px ${FONT}`, '#78828c', 2);
+}
+
+document.getElementById('btn-card').addEventListener('click', () => {
+  if (!shops.filter(s => s.visits.length > 0).length) {
+    alert('まだ記録がありません。\n1軒でも登録してからお試しください。');
+    return;
+  }
+  if (!boundaries.length) { alert('地図の読み込みが終わっていません。少し待ってからお試しください。'); return; }
+  drawCard();
+  cardModal.classList.add('show');
+});
+
+document.getElementById('card-close').addEventListener('click', () => cardModal.classList.remove('show'));
+cardModal.addEventListener('click', (e) => { if (e.target === cardModal) cardModal.classList.remove('show'); });
+
+// 画像として保存する
+document.getElementById('card-save').addEventListener('click', () => {
+  cardCanvas.toBlob(b => {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(b);
+    a.download = `udonmap_${today()}.png`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }, 'image/png');
+});
+
+/* 端末の共有機能に渡す。
+   スマホではここからInstagramやLINEなど、画像を受け取れるアプリに送れる。
+   対応していない環境（多くのPC）では保存にまわす。 */
+document.getElementById('card-share').addEventListener('click', () => {
+  cardCanvas.toBlob(async (b) => {
+    const file = new File([b], `udonmap_${today()}.png`, { type: 'image/png' });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({ files: [file], text: buildShareText() });
+      } catch (e) { /* ユーザーが取り消した場合は何もしない */ }
+    } else {
+      alert('この環境では共有機能が使えません。\n「画像を保存」からダウンロードしてください。');
+    }
+  }, 'image/png');
+});
+
+// Xの投稿画面を開く（画像は保存したものを手動で添付してもらう）
+document.getElementById('card-x').addEventListener('click', () => {
+  document.getElementById('btn-share').click();
 });
 
 
